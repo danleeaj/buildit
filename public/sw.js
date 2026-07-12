@@ -1,5 +1,5 @@
 const BUILD_VERSION = '__BUILD_VERSION__'
-const CACHE_PREFIX = 'buildit-shell-'
+const CACHE_PREFIX = 'superflow-shell-'
 const CACHE_NAME = `${CACHE_PREFIX}${BUILD_VERSION}`
 const PRECACHE_MANIFEST = 'precache-manifest.json'
 

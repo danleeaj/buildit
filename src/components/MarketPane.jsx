@@ -170,7 +170,7 @@ function errorCopy(error, isOnline) {
     return "Market research needs a connection. Your app is still safe and ready to use.";
   }
   if (error?.code === "missing-api-key") {
-    return "BuildIt needs its demo API key before it can research this market.";
+    return "Superflow needs its demo API key before it can research this market.";
   }
   if (error?.status === 429) {
     return "Research is temporarily busy. Wait a moment, then try again.";
@@ -235,7 +235,7 @@ function MarketProgress({ appName, stageIndex }) {
       <p className="quiet-label">Opportunity scan</p>
       <h1>Researching {appName || "your app"}.</h1>
       <p className="market-lede">
-        BuildIt is comparing what exists, where customers are underserved, and whether the numbers hold up.
+        Superflow is comparing what exists, where customers are underserved, and whether the numbers hold up.
       </p>
       <div className="market-progress-list">
         {MARKET_STAGES.map((stage, index) => (
@@ -472,7 +472,7 @@ export default function MarketPane({ snapshot, onBack, isOnline = true }) {
   const runResearch = useCallback(async ({ ignoreSaved = false } = {}) => {
     if (!snapshot) {
       setStatus("error");
-      setError(new Error("BuildIt could not read enough of the app to research it."));
+      setError(new Error("Superflow could not read enough of the app to research it."));
       return;
     }
 
@@ -684,7 +684,7 @@ export default function MarketPane({ snapshot, onBack, isOnline = true }) {
           <section className="market-follow-up" aria-labelledby="market-follow-up-title">
             <p className="quiet-label">Discuss the result</p>
             <h2 id="market-follow-up-title">Ask about this research.</h2>
-            <p>BuildIt will use the compact result above and only search again when your question needs fresh evidence.</p>
+            <p>Superflow will use the compact result above and only search again when your question needs fresh evidence.</p>
 
             {followUp && (
               <div className="market-follow-up-answer" aria-live="polite">

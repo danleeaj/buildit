@@ -1,6 +1,6 @@
-# BuildIt
+# Superflow
 
-BuildIt turns a spoken or typed problem into a focused, single-screen app. The current milestone is a demo-first PWA with arbitrary client-only app generation, a sandboxed live preview, and voice- or drawing-led edits.
+Superflow turns a spoken or typed problem into a focused, single-screen app. The current milestone is a demo-first PWA with arbitrary client-only app generation, a sandboxed live preview, and voice- or drawing-led edits.
 
 ## Run locally
 

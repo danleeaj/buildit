@@ -83,7 +83,7 @@ const PreviewFrame = forwardRef(function PreviewFrame(
           throw new Error("Storage key is invalid");
         }
 
-        const storageKey = `buildit:generated:${appId}`;
+        const storageKey = `superflow:generated:${appId}`;
         const bucket = mode === "live"
           ? readBucket(storageKey)
           : { ...ephemeralBucketRef.current };

@@ -1,7 +1,7 @@
 import html2canvasSource from "html2canvas/dist/html2canvas.min.js?raw";
 
-export const PREVIEW_MESSAGE_SOURCE = "buildit-preview";
-export const PARENT_MESSAGE_SOURCE = "buildit-parent";
+export const PREVIEW_MESSAGE_SOURCE = "superflow-preview";
+export const PARENT_MESSAGE_SOURCE = "superflow-parent";
 
 export const PREVIEW_CSP = [
   "default-src 'none'",
@@ -57,7 +57,7 @@ function createBridgeRuntime({ sessionId, appId, mode }) {
       send("storage-request", { requestId, operation, key, value });
     });
 
-    Object.defineProperty(window, "BuildItStore", {
+    Object.defineProperty(window, "SuperflowStore", {
       configurable: false,
       enumerable: true,
       writable: false,
@@ -179,7 +179,7 @@ export function assemblePreviewDocument(html, { appId, sessionId, mode = "live" 
   if (!root) throw new Error("Generated app root is missing");
 
   root.setAttribute("data-app-id", appId);
-  root.setAttribute("data-buildit-mode", mode);
+  root.setAttribute("data-superflow-mode", mode);
   doc.querySelectorAll('meta[http-equiv="Content-Security-Policy" i]').forEach((element) => element.remove());
 
   const csp = doc.createElement("meta");
@@ -191,11 +191,11 @@ export function assemblePreviewDocument(html, { appId, sessionId, mode = "live" 
   behaviorScripts.forEach((script) => script.remove());
 
   const captureLibrary = doc.createElement("script");
-  captureLibrary.setAttribute("data-buildit-bridge-library", "html2canvas");
+  captureLibrary.setAttribute("data-superflow-bridge-library", "html2canvas");
   captureLibrary.textContent = html2canvasSource;
 
   const bridge = doc.createElement("script");
-  bridge.setAttribute("data-buildit-bridge", "true");
+  bridge.setAttribute("data-superflow-bridge", "true");
   bridge.textContent = createBridgeRuntime({ sessionId, appId, mode });
 
   doc.head.append(captureLibrary, bridge);

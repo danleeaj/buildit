@@ -1,5 +1,5 @@
 const MARKET_STORAGE_VERSION = 1;
-const MARKET_STORAGE_PREFIX = "buildit:market-mission:v1";
+const MARKET_STORAGE_PREFIX = "superflow:market-mission:v1";
 const ALLOWED_VERDICTS = new Set([
   "promising",
   "uncertain",

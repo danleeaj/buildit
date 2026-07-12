@@ -47,7 +47,7 @@ import {
   workflowReducer,
 } from "./lib/workflow.js";
 
-const LAST_APP_KEY = "buildit:last-app";
+const LAST_APP_KEY = "superflow:last-app";
 const APPROVAL_PATTERN = /\b(yes|yeah|yep|sure|okay|ok|build it|go ahead|do it)\b/i;
 const REJECTION_PATTERN = /\b(no|nope|start over|different idea)\b/i;
 
@@ -85,7 +85,7 @@ function resultErrors(result, fallback) {
 
 function friendlyError(error) {
   if (!navigator.onLine) return "You are offline. Your current app still works, but creating and editing need a connection.";
-  if (error?.code === "missing-api-key") return "BuildIt needs an API key before it can create apps. Add it to your local .env file and reload.";
+  if (error?.code === "missing-api-key") return "Superflow needs an API key before it can create apps. Add it to your local .env file and reload.";
   if (error?.code === "api-error") return "The app service did not respond cleanly. Try again in a moment.";
   return error instanceof Error ? error.message : String(error || "Something went wrong. Try again.");
 }
@@ -106,7 +106,7 @@ function progressContent(phase) {
     [WORKFLOW_PHASES.EDITING]: ["Making the change", "Updating only the part you pointed to."],
     [WORKFLOW_PHASES.VALIDATING_EDIT]: ["Checking the change", "Your working version stays safe until this one passes."],
   };
-  return content[phase] || ["Working on it", "BuildIt is preparing the next step."];
+  return content[phase] || ["Working on it", "Superflow is preparing the next step."];
 }
 
 async function validateModelDocument(modelResult, appId) {
@@ -295,7 +295,7 @@ export default function App() {
         html,
       });
       persistLastApp(html, appId, nextProjectSnapshot);
-      console.info("BuildIt generation timing", {
+      console.info("Superflow generation timing", {
         totalMs: Math.round(performance.now() - startedAt),
       });
       dispatch({
@@ -399,7 +399,7 @@ export default function App() {
         latestChange: cleanInstruction,
       });
       persistLastApp(html, state.appId, nextProjectSnapshot);
-      console.info("BuildIt edit timing", {
+      console.info("Superflow edit timing", {
         totalMs: Math.round(performance.now() - startedAt),
       });
       dispatch({
@@ -426,7 +426,7 @@ export default function App() {
   };
 
   const showDeployBoundary = () => {
-    setDeployNotice("Personal deployment is not enabled in this demo yet. Your working app remains saved in BuildIt.");
+    setDeployNotice("Personal deployment is not enabled in this demo yet. Your working app remains saved in Superflow.");
   };
 
   const exploreOpportunities = () => {
@@ -452,7 +452,7 @@ export default function App() {
     if (state.phase === WORKFLOW_PHASES.ERROR && !hasApp) {
       return (
         <section className="error-panel">
-          <p className="quiet-label">BuildIt paused</p>
+          <p className="quiet-label">Superflow paused</p>
           <h1>That did not work yet.</h1>
           <p className="error-copy">{state.error}</p>
           <div className="error-actions">
@@ -559,7 +559,7 @@ export default function App() {
         <aside className="input-rail">
           <div className="rail-inner">
             <header className="brand-row">
-              <span className="brand-wordmark"><span className="brand-mark">B</span>BuildIt</span>
+              <span className="brand-wordmark"><span className="brand-mark">S</span>Superflow</span>
               <span className={`connection-state ${connectivity.isOnline ? "" : "offline"}`}>
                 {isApiConfigured() ? (connectivity.isOnline ? "Ready" : "Offline") : "Setup needed"}
               </span>
@@ -588,7 +588,7 @@ export default function App() {
                 )}
                 {installState.canInstall && (
                   <button type="button" className="text-action install-action" onClick={promptInstall}>
-                    <InstallIcon size={17} /> Add BuildIt to this device
+                    <InstallIcon size={17} /> Add Superflow to this device
                   </button>
                 )}
                 {installState.needsManualIosInstall && (
@@ -707,8 +707,8 @@ export default function App() {
                       speech={speech}
                       title={state.pendingDrawing ? "What should change here?" : "What should change?"}
                       description={state.pendingDrawing
-                        ? "The mark already tells BuildIt where to look. Speak naturally about the result you want."
-                        : "Describe the change. BuildIt will keep the working version until the update passes."}
+                        ? "The mark already tells Superflow where to look. Speak naturally about the result you want."
+                        : "Describe the change. Superflow will keep the working version until the update passes."}
                       textValue={draft}
                       onTextValueChange={setDraft}
                       onSubmit={submitEdit}

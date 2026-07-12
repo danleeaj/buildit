@@ -61,7 +61,7 @@ async function callModel({
   };
 }
 
-const PROPOSAL_SYSTEM = `You are BuildIt, an opinionated app builder for nontechnical people.
+const PROPOSAL_SYSTEM = `You are Superflow, an opinionated app builder for nontechnical people.
 The user explains a real-world problem aloud. Propose one focused, single-screen, client-only app.
 
 Rules:
@@ -93,17 +93,17 @@ const GENERATED_DOCUMENT_RULES = `Return exactly one fenced block labeled html:a
 The document must:
 - Be a complete single-screen mobile-first app under 16KB when possible and never intentionally exceed 32KB.
 - Use only inline CSS and vanilla JavaScript. No packages, CDNs, external assets, network calls, workers, popups, or navigation.
-- Contain exactly one element with data-app-root. Do not assign data-app-id; BuildIt assigns it.
+- Contain exactly one element with data-app-root. Do not assign data-app-id; Superflow assigns it.
 - Give every independently editable region a unique data-component matching ^[A-Za-z][A-Za-z0-9_-]{0,63}$.
 - Include style[data-style-region="app"] and script[data-behavior-region="app"], even when one is empty.
 - Use addEventListener rather than inline on* attributes.
-- Use window.BuildItStore.get/set/remove for optional persistence. Do not access cookies, localStorage, sessionStorage, or IndexedDB.
+- Use window.SuperflowStore.get/set/remove for optional persistence. Do not access cookies, localStorage, sessionStorage, or IndexedDB.
 - Never use fetch, XMLHttpRequest, WebSocket, EventSource, sendBeacon, eval, Function, document.write, window.open, parent, top, opener, service workers, nested frames, objects, embeds, base tags, meta refresh, form action URLs, CSS imports, or external CSS URLs.
 - Include a viewport meta tag, semantic controls, visible labels, keyboard focus styles, reduced-motion handling, and 44px touch targets.
 - Implement real working behavior, not a static mockup.
 - Seed the app with relevant details from the conversation so it appears useful immediately.`;
 
-const GENERATION_SYSTEM = `You generate complete, dependable single-file applications for BuildIt.
+const GENERATION_SYSTEM = `You generate complete, dependable single-file applications for Superflow.
 Follow this design contract exactly:
 
 ${designMd}
@@ -150,7 +150,7 @@ ${candidate || "The response was missing or truncated."}`,
   });
 }
 
-const EDIT_SYSTEM = `You patch a working BuildIt app after the user draws on a region and speaks a change.
+const EDIT_SYSTEM = `You patch a working Superflow app after the user draws on a region and speaks a change.
 Follow the design contract:
 
 ${designMd}

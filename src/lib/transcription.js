@@ -54,7 +54,7 @@ export function createTranscriptionClient({
     }
 
     const form = new FormData();
-    form.append("file", blob, `buildit-voice.${audioExtension(blob.type)}`);
+    form.append("file", blob, `superflow-voice.${audioExtension(blob.type)}`);
     form.append("model", model);
     if (language) form.append("language", language.split("-")[0]);
 

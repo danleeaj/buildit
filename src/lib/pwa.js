@@ -56,13 +56,13 @@ function isIosDevice() {
   )
 }
 
-export async function unregisterBuildItServiceWorker() {
+export async function unregisterSuperflowServiceWorker() {
   if (!hasWindow() || !('serviceWorker' in navigator)) return false
 
   const baseUrl = getPwaBaseUrl()
   const workerUrl = new URL('sw.js', baseUrl).href
   const registrations = await navigator.serviceWorker.getRegistrations()
-  const matchesBuildIt = (registration) => {
+  const matchesSuperflow = (registration) => {
     const workers = [registration.installing, registration.waiting, registration.active]
     return (
       registration.scope === baseUrl.href
@@ -71,7 +71,7 @@ export async function unregisterBuildItServiceWorker() {
   }
 
   const results = await Promise.all(
-    registrations.filter(matchesBuildIt).map((registration) => registration.unregister()),
+    registrations.filter(matchesSuperflow).map((registration) => registration.unregister()),
   )
   return results.some(Boolean)
 }
@@ -90,7 +90,7 @@ export async function setupPwa() {
   if (!hasWindow() || !('serviceWorker' in navigator)) return null
 
   if (!IS_PRODUCTION) {
-    await unregisterBuildItServiceWorker()
+    await unregisterSuperflowServiceWorker()
     return null
   }
 

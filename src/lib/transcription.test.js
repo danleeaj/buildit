@@ -45,7 +45,7 @@ describe("createTranscriptionClient", () => {
     const uploadedFile = request.options.body.get("file");
     expect(uploadedFile).toBeInstanceOf(Blob);
     expect(uploadedFile.type).toBe("audio/mp4");
-    expect(uploadedFile.name).toBe("buildit-voice.mp4");
+    expect(uploadedFile.name).toBe("superflow-voice.mp4");
   });
 
   test("does not call the network without an API key", async () => {

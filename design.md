@@ -1,4 +1,4 @@
-# BuildIt Generated App Design Contract
+# Superflow Generated App Design Contract
 
 ## Product feel
 
@@ -81,7 +81,7 @@ Red is functional. Use it only for recording, ink annotations, destructive actio
 
 ### App header
 
-The generated app owns its title. Use a compact content header with an `h1`, optional one-line context, and no desktop-style navbar. BuildIt's back/edit/share controls live outside the generated document.
+The generated app owns its title. Use a compact content header with an `h1`, optional one-line context, and no desktop-style navbar. Superflow's back/edit/share controls live outside the generated document.
 
 ### Primary action
 
@@ -148,8 +148,8 @@ The generated app owns its title. Use a compact content header with an `h1`, opt
 - Include `style[data-style-region="app"]` and `script[data-behavior-region="app"]`, even if one is empty.
 - Component-specific style or behavior regions use the component name as their region name.
 - Keep CSS and JavaScript inline and dependency-free.
-- Use the injected asynchronous `window.BuildItStore` API when persistence is useful.
-- Do not create a second BuildIt navigation shell inside the app.
+- Use the injected asynchronous `window.SuperflowStore` API when persistence is useful.
+- Do not create a second Superflow navigation shell inside the app.
 
 ## Avoid
 

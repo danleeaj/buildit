@@ -21,13 +21,13 @@ function contentOfBundleEntry(entry) {
   return Buffer.from(entry.source)
 }
 
-function buildItPrecachePlugin() {
+function superflowPrecachePlugin() {
   let outputDirectory
   let publicDirectory
   let buildVersion
 
   return {
-    name: 'buildit-precache-manifest',
+    name: 'superflow-precache-manifest',
     apply: 'build',
     enforce: 'post',
 
@@ -86,7 +86,7 @@ function buildItPrecachePlugin() {
         : ''
 
       if (!serviceWorker.includes('__BUILD_VERSION__')) {
-        this.error('Could not stamp the BuildIt service worker with its precache version.')
+        this.error('Could not stamp the Superflow service worker with its precache version.')
       }
 
       writeFileSync(
@@ -98,5 +98,5 @@ function buildItPrecachePlugin() {
 }
 
 export default defineConfig({
-  plugins: [react(), buildItPrecachePlugin()],
+  plugins: [react(), superflowPrecachePlugin()],
 })

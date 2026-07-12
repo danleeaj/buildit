@@ -1,4 +1,4 @@
-# PRD — BuildIt
+# PRD — Superflow
 **Opinionated, problem-first, no-code app builder with sketch-and-talk editing**
 
 - **Author:** Dan (An Jie Lee)
@@ -38,13 +38,13 @@ The product is **opinionated by design**: it builds *the right app*, not *any ap
 
 Artifacts (and Lovable/Bolt/v0) are the closest comparison and a judge **will** ask. Do not lead with weak claims: "opinionated," "auto deployment," and "faster iteration" are all things Artifacts partially has. The real answer is four points:
 
-1. **Interaction model.** Artifacts is chat-about-a-document: describe changes in words, sidebar regenerates. BuildIt is **direct manipulation of the running product** — circle the part you don't like, on the thing itself. Different grammar of interaction, not a feature gap.
-2. **Problem-first, not prompt-first.** Artifacts is an execution engine that assumes you arrive with a spec. BuildIt's interview → proposal → "want it?" discovery layer doesn't exist there at all.
+1. **Interaction model.** Artifacts is chat-about-a-document: describe changes in words, sidebar regenerates. Superflow is **direct manipulation of the running product** — circle the part you don't like, on the thing itself. Different grammar of interaction, not a feature gap.
+2. **Problem-first, not prompt-first.** Artifacts is an execution engine that assumes you arrive with a spec. Superflow's interview → proposal → "want it?" discovery layer doesn't exist there at all.
 3. **Built for the person, not the builder.** No visible code, no version dropdowns, no model pickers. Mobile-native: built on a phone, drawn on with a finger, shared to a phone. Artifacts on mobile is a viewing experience.
-4. **Choosing instead of describing.** Non-technical users can't specify fixes ("make it more detailed" is as precise as they get). Artifacts makes them iterate in prose; BuildIt shows two live variants and lets them point. Selection is a universal skill; specification isn't.
+4. **Choosing instead of describing.** Non-technical users can't specify fixes ("make it more detailed" is as precise as they get). Artifacts makes them iterate in prose; Superflow shows two live variants and lets them point. Selection is a universal skill; specification isn't.
 
 **Rehearsed 20-second answer:**
-> "Artifacts is amazing if you can describe what you want — it's a text interface for people who think in specs. BuildIt is for people who think in problems. You don't describe changes, you circle them. You don't evaluate options in your head, you tap the one you like. Same engine class underneath — completely different front door. We'd love to be what Artifacts looks like for the other 95% of people."
+> "Artifacts is amazing if you can describe what you want — it's a text interface for people who think in specs. Superflow is for people who think in problems. You don't describe changes, you circle them. You don't evaluate options in your head, you tap the one you like. Same engine class underneath — completely different front door. We'd love to be what Artifacts looks like for the other 95% of people."
 
 **Demo tactic:** include one moment of deliberately vague input — circle + "this bit, more… y'know, detail" — handled gracefully. That *shows* the gap instead of arguing it.
 

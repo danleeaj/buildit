@@ -1,7 +1,7 @@
 {
   "id": ".",
-  "name": "BuildIt",
-  "short_name": "BuildIt",
+  "name": "Superflow",
+  "short_name": "Superflow",
   "description": "Build useful, personal apps with your voice and a pen.",
   "start_url": ".",
   "scope": ".",
