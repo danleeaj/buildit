@@ -540,8 +540,8 @@ Commit: `git add src/App.jsx src/components/AuthGate.jsx src/lib/workflow.test.j
 - Modify: `src/lib/generatedApp.js`
 
 **Interfaces:**
-- Produces: `bun run dev` for the Vercel-backed full stack.
-- Produces: `bun run dev:vite` for UI-only Vite development.
+- Produces: `bun run dev:full` for the Vercel-backed full stack.
+- Produces: `bun run dev` for UI-only Vite development; Vercel invokes this underlying command.
 
 - [ ] **Step 1: Add the development-only Vercel runtime with Bun**
 
@@ -554,8 +554,8 @@ Expected: `package.json` and `bun.lock` add `vercel` only under `devDependencies
 ```json
 {
   "scripts": {
-    "dev": "vercel dev",
-    "dev:vite": "vite --host",
+    "dev": "vite --host --port ${PORT:-5173}",
+    "dev:full": "vercel dev",
     "build": "vite build"
   }
 }

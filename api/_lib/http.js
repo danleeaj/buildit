@@ -26,7 +26,7 @@ export async function body(req) {
 export function fail(res, error) {
   const status = Number.isInteger(error?.status) ? error.status : 500;
   const message = status >= 500 ? "Something went wrong. Please try again." : error.message;
-  json(res, status, { error: message });
+  json(res, status, { error: message, ...(error?.code ? { code: error.code } : {}) });
 }
 
 export function notFound() {

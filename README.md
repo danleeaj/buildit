@@ -7,14 +7,32 @@ Superflow turns a spoken or typed problem into a focused, single-screen app. The
 ```bash
 bun install
 cp .env.example .env
-bun run dev
+bun run dev:full
 ```
 
-Add a working OpenAI API key to `.env`, then open the local URL printed by Vite.
+`bun run dev:full` starts the Vercel local runtime, which serves both Vite and
+the functions under `/api`. Use `bun run dev` only for UI-only work; Vite by
+itself cannot exercise authenticated project persistence. The separate names
+are required because Vercel invokes the underlying `dev` command itself.
+
+Add a working OpenAI API key to `.env`, then open the local URL printed by the
+development server.
 
 ## Neon persistence
 
-For authenticated projects, connect Neon to Vercel, enable Neon Auth, and add the values in `.env.example` to Vercel and your local `.env`. Run `bun run db:migrate`, create the demo user in Neon Auth, set its ID as `DEMO_OWNER_ID`, then run `bun run db:seed-demo`. Add your Vercel URL to Neon Auth's allowed origins before testing Google sign-in.
+For authenticated projects, connect Neon to Vercel, enable Neon Auth, and set
+`DATABASE_URL` and `VITE_NEON_AUTH_URL` in both Vercel and your local `.env`.
+Neon normally adds `NEON_AUTH_BASE_URL`; `NEON_AUTH_JWKS_URL` is available as
+an explicit override. Without that override, the API verifies tokens against
+the Neon Auth base URL's `/jwt` endpoint. Run `bun run db:migrate`, create the
+demo user in Neon Auth, set its ID as `DEMO_OWNER_ID`, then run
+`bun run db:seed-demo`.
+
+Add both the local Vercel development URL and the deployed application URL to
+Neon Auth's allowed origins before testing sign-in. A browser session can look
+valid while project requests fail if neither auth URL is present in the server
+environment; the Projects screen reports this as a storage configuration
+error.
 
 ## Voice input
 

@@ -295,6 +295,35 @@ input:disabled {
   background: rgb(180 35 42 / 0.05);
 }
 
+.account-control {
+  min-height: 38px;
+  margin-top: 8px;
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.account-identity {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-control button,
+.save-status button {
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--ink-soft);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
 .demo-mode-banner {
   display: flex;
   align-items: center;
@@ -679,6 +708,17 @@ input:disabled {
   gap: 12px;
 }
 
+.projects-state {
+  margin: 38px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.projects-state .inline-error {
+  margin: 0 0 8px;
+}
+
 .project-open-card {
   width: 100%;
   border-color: var(--border);
@@ -695,6 +735,42 @@ input:disabled {
 
 .share-action {
   margin-top: 18px;
+}
+
+.save-status {
+  width: min(100%, 440px);
+  min-height: 30px;
+  margin: 14px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.save-status.is-saving::before,
+.save-status.is-saved::before,
+.save-status.is-error::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.save-status.is-saved {
+  color: #34724a;
+}
+
+.save-status.is-error {
+  color: var(--danger);
+}
+
+.save-status.is-error button {
+  color: var(--danger);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .project-card-label {

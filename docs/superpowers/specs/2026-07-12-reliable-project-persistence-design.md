@@ -71,8 +71,10 @@ Local development must serve both the Vite application and Vercel functions so `
 Documentation will list the required values:
 
 - `VITE_NEON_AUTH_URL`
-- `NEON_AUTH_JWKS_URL`
 - `DATABASE_URL`
+
+The server will prefer an explicit `NEON_AUTH_JWKS_URL`, then derive the
+standard `/jwt` endpoint from `NEON_AUTH_BASE_URL` or `VITE_NEON_AUTH_URL`.
 
 The development setup will fail clearly when authenticated project persistence is requested without its server-side configuration. Neon allowed origins must include the local and deployed application origins used for authentication.
 

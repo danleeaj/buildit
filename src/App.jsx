@@ -12,12 +12,15 @@ import {
   RetryIcon,
 } from "./components/Icons.jsx";
 import CompletionActions from "./components/CompletionActions.jsx";
+import AccountControl from "./components/AccountControl.jsx";
 import HyperspaceBackground from "./components/HyperspaceBackground.jsx";
 import IntakeQuestion from "./components/IntakeQuestion.jsx";
 import MarketPane from "./components/MarketPane.jsx";
 import PreviewFrame from "./components/PreviewFrame.jsx";
 import ProjectsPlaceholder from "./components/ProjectsPlaceholder.jsx";
+import SaveStatus from "./components/SaveStatus.jsx";
 import VoiceCapture from "./components/VoiceCapture.jsx";
+import useProjectPersistence from "./hooks/useProjectPersistence.js";
 import useSpeechRecognition from "./hooks/useSpeechRecognition.js";
 import {
   isAudioTranscriptionConfigured,
@@ -47,7 +50,7 @@ import {
   subscribeToConnectivity,
 } from "./lib/pwa.js";
 import { apiRequest } from "./lib/apiClient.js";
-import { useAuthSession } from "./lib/authClient.js";
+import { authClient, useAuthSession } from "./lib/authClient.js";
 import { analyzeBackendRequirements } from "./lib/backendRequirements.js";
 import {
   WORKFLOW_PHASES,
@@ -249,9 +252,6 @@ export default function App({ demoMode = false, onLeaveDemo }) {
   const [voiceFinishRequested, setVoiceFinishRequested] = useState(false);
   const [voiceDrawingError, setVoiceDrawingError] = useState("");
   const [demoLoadError, setDemoLoadError] = useState("");
-  const [projects, setProjects] = useState([]);
-  const [projectsError, setProjectsError] = useState("");
-  const [activeProjectId, setActiveProjectId] = useState(null);
   const [shareNotice, setShareNotice] = useState("");
   const shareUrlRef = useRef("");
   const previewRef = useRef(null);
@@ -264,6 +264,7 @@ export default function App({ demoMode = false, onLeaveDemo }) {
     transcribe: isAudioTranscriptionConfigured() ? transcribeAudio : null,
   });
   const { user } = useAuthSession();
+  const persistence = useProjectPersistence(demoMode ? null : user?.id);
 
   const history = useMemo(
     () => conversationHistory(state.activity),
@@ -304,15 +305,6 @@ export default function App({ demoMode = false, onLeaveDemo }) {
       });
     return () => { cancelled = true; };
   }, [demoMode]);
-
-  useEffect(() => {
-    if (!user || demoMode) return undefined;
-    let cancelled = false;
-    apiRequest("/api/projects")
-      .then(({ projects: loaded }) => { if (!cancelled) setProjects(loaded); })
-      .catch((error) => { if (!cancelled) setProjectsError(error.message); });
-    return () => { cancelled = true; };
-  }, [demoMode, user?.id]);
 
   useEffect(() => {
     const controller = createInstallController();
@@ -372,9 +364,8 @@ export default function App({ demoMode = false, onLeaveDemo }) {
     dispatch({ type: "ERROR", error: friendlyError(error), resumePhase });
   };
 
-  async function persistProject({ html, snapshot, editNote = null }) {
-    if (!user || demoMode) return;
-    const payload = {
+  function projectPayload({ html, snapshot, editNote = null }) {
+    return {
       title: appTitleFromHtml(html),
       problem: state.problem,
       html,
@@ -382,47 +373,34 @@ export default function App({ demoMode = false, onLeaveDemo }) {
       conversation: state.activity,
       editNote,
     };
-    try {
-      if (activeProjectId) {
-        await apiRequest(`/api/projects/${activeProjectId}/versions`, { method: "POST", body: payload });
-      } else {
-        const { project } = await apiRequest("/api/projects", { method: "POST", body: payload });
-        setActiveProjectId(project.id);
-      }
-      const { projects: refreshed } = await apiRequest("/api/projects");
-      setProjects(refreshed);
-    } catch (error) {
-      setProjectsError(`Your app is ready, but it could not be saved: ${error.message}`);
-    }
   }
 
   async function openProject(projectId) {
     try {
-      const { project } = await apiRequest(`/api/projects/${projectId}`);
+      const project = await persistence.openProject(projectId);
       shareUrlRef.current = "";
       setShareNotice("");
-      setActiveProjectId(project.id);
       setProjectsOpen(false);
       dispatch({ type: "PROJECT_LOADED", project });
-    } catch (error) {
-      setProjectsError(error.message);
+    } catch {
+      // The controller exposes the actionable error in the Projects screen.
     }
   }
 
   const createShareUrl = useCallback(async () => {
     if (shareUrlRef.current) return shareUrlRef.current;
-    if (!activeProjectId || demoMode) throw new Error("Sign in to create a live share URL.");
+    if (!persistence.activeProjectId || demoMode) throw new Error("Sign in to create a live share URL.");
 
-    const { versions } = await apiRequest(`/api/projects/${activeProjectId}/versions`);
+    const { versions } = await apiRequest(`/api/projects/${persistence.activeProjectId}/versions`);
     if (!versions[0]) throw new Error("No saved version is available yet.");
-    const { url } = await apiRequest(`/api/projects/${activeProjectId}/share`, {
+    const { url } = await apiRequest(`/api/projects/${persistence.activeProjectId}/share`, {
       method: "POST",
       body: { versionId: versions[0].id },
     });
     const absoluteUrl = `${window.location.origin}${url}`;
     shareUrlRef.current = absoluteUrl;
     return absoluteUrl;
-  }, [activeProjectId, demoMode]);
+  }, [demoMode, persistence.activeProjectId]);
 
   async function shareCurrentVersion() {
     try {
@@ -568,7 +546,10 @@ export default function App({ demoMode = false, onLeaveDemo }) {
         projectSnapshot: nextProjectSnapshot,
         message: `${appTitleFromHtml(html)} is ready. Use it, draw on it, or speak another change.`,
       });
-      void persistProject({ html, snapshot: nextProjectSnapshot });
+      void persistence.saveProject(projectPayload({
+        html,
+        snapshot: nextProjectSnapshot,
+      }));
       setPreviewReady(false);
       setActivePane("app");
       setMarketSnapshot(null);
@@ -596,6 +577,7 @@ export default function App({ demoMode = false, onLeaveDemo }) {
     setVoiceDrawing(false);
     setVoiceFinishRequested(false);
     setVoiceDrawingError("");
+    persistence.startNewProject();
     dispatch({ type: "NEW_APP" });
   };
 
@@ -739,7 +721,11 @@ export default function App({ demoMode = false, onLeaveDemo }) {
         projectSnapshot: nextProjectSnapshot,
         message: "Changed. Your previous version stayed in place until this one passed its checks.",
       });
-      void persistProject({ html, snapshot: nextProjectSnapshot, editNote: cleanInstruction });
+      void persistence.saveProject(projectPayload({
+        html,
+        snapshot: nextProjectSnapshot,
+        editNote: cleanInstruction,
+      }));
       setPreviewReady(false);
       operationRef.current = false;
     } catch (error) {
@@ -901,8 +887,10 @@ export default function App({ demoMode = false, onLeaveDemo }) {
           <div className="entry-projects-screen" aria-hidden={!projectsOpen} inert={!projectsOpen ? "" : undefined}>
             <ProjectsPlaceholder
               onReturn={() => setProjectsOpen(false)}
-              projects={projects}
-              error={projectsError}
+              projects={persistence.projects}
+              listStatus={persistence.listStatus}
+              error={persistence.listError}
+              onRetry={persistence.loadProjects}
               onOpenProject={openProject}
             />
           </div>
@@ -914,12 +902,19 @@ export default function App({ demoMode = false, onLeaveDemo }) {
       <section className="proposal-panel">
         <p className="quiet-label">Live app</p>
         <h1>Your app is ready.</h1>
+        {!demoMode && (
+          <SaveStatus
+            status={persistence.saveStatus}
+            error={persistence.saveError}
+            onRetry={persistence.retrySave}
+          />
+        )}
         <p className="error-copy">Use it on the right, keep improving it, or see whether the idea could travel further.</p>
         <CompletionActions
           onDeploy={showDeployBoundary}
           onExplore={exploreOpportunities}
         />
-        {!demoMode && activeProjectId && <button type="button" className="text-action share-action" onClick={shareCurrentVersion}>Share current version</button>}
+        {!demoMode && persistence.activeProjectId && <button type="button" className="text-action share-action" onClick={shareCurrentVersion}>Share current version</button>}
         {shareNotice && <p className="sheet-context">{shareNotice}</p>}
         <div className="keep-improving">
           <p className="quiet-label">Keep improving</p>
@@ -957,6 +952,13 @@ export default function App({ demoMode = false, onLeaveDemo }) {
                 {isApiConfigured() ? (connectivity.isOnline ? "Ready" : "Offline") : "Setup needed"}
               </span>
             </header>
+
+            {!demoMode && user && (
+              <AccountControl
+                user={user}
+                onSignOut={() => { void authClient.signOut(); }}
+              />
+            )}
 
             {demoMode && (
               <div className="demo-mode-banner">
