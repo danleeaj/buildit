@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import DeploymentScreen from "./components/DeploymentScreen.jsx";
 import DrawOverlay from "./components/DrawOverlay.jsx";
 import {
   BackIcon,
@@ -47,6 +48,7 @@ import {
 } from "./lib/pwa.js";
 import { apiRequest } from "./lib/apiClient.js";
 import { useAuthSession } from "./lib/authClient.js";
+import { analyzeBackendRequirements } from "./lib/backendRequirements.js";
 import {
   WORKFLOW_PHASES,
   createInitialWorkflow,
@@ -240,7 +242,7 @@ export default function App({ demoMode = false, onLeaveDemo }) {
   });
   const [activePane, setActivePane] = useState("app");
   const [marketSnapshot, setMarketSnapshot] = useState(null);
-  const [deployNotice, setDeployNotice] = useState("");
+  const [deploymentOpen, setDeploymentOpen] = useState(false);
   const [mobileCompletionOpen, setMobileCompletionOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [voiceDrawing, setVoiceDrawing] = useState(false);
@@ -251,6 +253,7 @@ export default function App({ demoMode = false, onLeaveDemo }) {
   const [projectsError, setProjectsError] = useState("");
   const [activeProjectId, setActiveProjectId] = useState(null);
   const [shareNotice, setShareNotice] = useState("");
+  const shareUrlRef = useRef("");
   const previewRef = useRef(null);
   const drawOverlayRef = useRef(null);
   const operationRef = useRef(false);
@@ -278,6 +281,13 @@ export default function App({ demoMode = false, onLeaveDemo }) {
       previousSnapshot: state.projectSnapshot,
     });
   }, [state.appId, state.html, state.problem, state.projectSnapshot, state.proposal]);
+
+  const backendRequirements = useMemo(() => analyzeBackendRequirements({
+    problem: state.problem,
+    proposal: state.proposal,
+    snapshot: projectSnapshot,
+    html: state.html,
+  }), [projectSnapshot, state.html, state.problem, state.proposal]);
 
   useEffect(() => subscribeToConnectivity(setConnectivity), []);
 
@@ -389,6 +399,8 @@ export default function App({ demoMode = false, onLeaveDemo }) {
   async function openProject(projectId) {
     try {
       const { project } = await apiRequest(`/api/projects/${projectId}`);
+      shareUrlRef.current = "";
+      setShareNotice("");
       setActiveProjectId(project.id);
       setProjectsOpen(false);
       dispatch({ type: "PROJECT_LOADED", project });
@@ -397,15 +409,26 @@ export default function App({ demoMode = false, onLeaveDemo }) {
     }
   }
 
+  const createShareUrl = useCallback(async () => {
+    if (shareUrlRef.current) return shareUrlRef.current;
+    if (!activeProjectId || demoMode) throw new Error("Sign in to create a live share URL.");
+
+    const { versions } = await apiRequest(`/api/projects/${activeProjectId}/versions`);
+    if (!versions[0]) throw new Error("No saved version is available yet.");
+    const { url } = await apiRequest(`/api/projects/${activeProjectId}/share`, {
+      method: "POST",
+      body: { versionId: versions[0].id },
+    });
+    const absoluteUrl = `${window.location.origin}${url}`;
+    shareUrlRef.current = absoluteUrl;
+    return absoluteUrl;
+  }, [activeProjectId, demoMode]);
+
   async function shareCurrentVersion() {
-    if (!activeProjectId || demoMode) return;
     try {
-      const { versions } = await apiRequest(`/api/projects/${activeProjectId}/versions`);
-      if (!versions[0]) throw new Error("No saved version is available yet.");
-      const { url } = await apiRequest(`/api/projects/${activeProjectId}/share`, { method: "POST", body: { versionId: versions[0].id } });
-      setShareNotice(`${window.location.origin}${url}`);
+      setShareNotice(await createShareUrl());
     } catch (error) {
-      setShareNotice(error.message);
+      setShareNotice(error instanceof Error ? error.message : "The share URL could not be created.");
     }
   }
 
@@ -549,7 +572,7 @@ export default function App({ demoMode = false, onLeaveDemo }) {
       setPreviewReady(false);
       setActivePane("app");
       setMarketSnapshot(null);
-      setDeployNotice("");
+      setDeploymentOpen(false);
       setMobileCompletionOpen(true);
       operationRef.current = false;
     } catch (error) {
@@ -565,7 +588,9 @@ export default function App({ demoMode = false, onLeaveDemo }) {
     setPreviewReady(false);
     setActivePane("app");
     setMarketSnapshot(null);
-    setDeployNotice("");
+    setDeploymentOpen(false);
+    shareUrlRef.current = "";
+    setShareNotice("");
     setMobileCompletionOpen(false);
     setProjectsOpen(false);
     setVoiceDrawing(false);
@@ -732,13 +757,13 @@ export default function App({ demoMode = false, onLeaveDemo }) {
   };
 
   const showDeployBoundary = () => {
-    setDeployNotice("Personal deployment is not enabled in this demo yet. Your working app remains saved in Superflow.");
+    setDeploymentOpen(true);
+    setMobileCompletionOpen(false);
   };
 
   const exploreOpportunities = () => {
     if (!projectSnapshot) return;
     setMarketSnapshot(projectSnapshot);
-    setDeployNotice("");
     setMobileCompletionOpen(false);
     setActivePane("market");
   };
@@ -765,6 +790,18 @@ export default function App({ demoMode = false, onLeaveDemo }) {
       WORKFLOW_PHASES.EDITING,
       WORKFLOW_PHASES.VALIDATING_EDIT,
     ].includes(state.phase);
+
+  if (deploymentOpen && hasApp) {
+    return (
+      <DeploymentScreen
+        appTitle={appTitleFromHtml(state.html)}
+        services={backendRequirements}
+        demoMode={demoMode}
+        onCreateShareUrl={createShareUrl}
+        onBack={() => setDeploymentOpen(false)}
+      />
+    );
+  }
 
   const railMain = (() => {
     if (state.phase === WORKFLOW_PHASES.ERROR && !hasApp) {
@@ -881,7 +918,6 @@ export default function App({ demoMode = false, onLeaveDemo }) {
         <CompletionActions
           onDeploy={showDeployBoundary}
           onExplore={exploreOpportunities}
-          deployNotice={deployNotice}
         />
         {!demoMode && activeProjectId && <button type="button" className="text-action share-action" onClick={shareCurrentVersion}>Share current version</button>}
         {shareNotice && <p className="sheet-context">{shareNotice}</p>}
@@ -1048,7 +1084,6 @@ export default function App({ demoMode = false, onLeaveDemo }) {
                     <CompletionActions
                       onDeploy={showDeployBoundary}
                       onExplore={exploreOpportunities}
-                      deployNotice={deployNotice}
                       compact
                     />
                     <button type="button" className="text-action keep-editing-action" onClick={() => setMobileCompletionOpen(false)}>

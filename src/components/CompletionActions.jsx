@@ -4,7 +4,6 @@ import "./MarketPane.css";
 export default function CompletionActions({
   onDeploy,
   onExplore,
-  deployNotice = "",
   compact = false,
 }) {
   return (
@@ -45,12 +44,6 @@ export default function CompletionActions({
           <ArrowIcon className="completion-action-arrow" size={18} />
         </button>
       </div>
-
-      {deployNotice && (
-        <p className="completion-notice" role="status">
-          {deployNotice}
-        </p>
-      )}
     </section>
   );
 }
