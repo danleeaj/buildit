@@ -1,6 +1,8 @@
 export const WORKFLOW_PHASES = Object.freeze({
   IDLE: "idle",
   CAPTURING_PROBLEM: "capturing_problem",
+  DISCOVERING: "discovering",
+  ANSWERING_INTAKE: "answering_intake",
   PROPOSING: "proposing",
   AWAITING_APPROVAL: "awaiting_approval",
   GENERATING: "generating",
@@ -39,6 +41,9 @@ export function createInitialWorkflow(restored = null) {
     html: restored?.html || null,
     appId: restored?.appId || null,
     projectSnapshot: restoredSnapshot,
+    intakeQuestions: [],
+    intakeIndex: 0,
+    intakeAnswers: [],
     pendingDrawing: null,
     error: null,
     resumePhase: hasRestoredApp ? WORKFLOW_PHASES.READY : WORKFLOW_PHASES.IDLE,
@@ -59,14 +64,53 @@ export function workflowReducer(state, action) {
     case "PROBLEM_SUBMITTED":
       return {
         ...state,
-        phase: WORKFLOW_PHASES.PROPOSING,
+        phase: WORKFLOW_PHASES.DISCOVERING,
         problem: action.problem,
         proposal: "",
+        intakeQuestions: [],
+        intakeIndex: 0,
+        intakeAnswers: [],
         projectSnapshot: null,
         pendingDrawing: null,
         error: null,
         activity: [...state.activity, createActivity("user", action.problem, "problem")],
       };
+
+    case "INTAKE_READY":
+      return {
+        ...state,
+        phase: WORKFLOW_PHASES.ANSWERING_INTAKE,
+        intakeQuestions: action.questions,
+        intakeIndex: 0,
+        intakeAnswers: [],
+        error: null,
+        activity: [...state.activity, createActivity("assistant", action.questions[0].question, "question")],
+      };
+
+    case "INTAKE_SKIPPED":
+      return { ...state, phase: WORKFLOW_PHASES.PROPOSING, error: null };
+
+    case "INTAKE_ANSWERED": {
+      const intakeAnswers = [...state.intakeAnswers, {
+        id: action.question.id,
+        question: action.question.question,
+        answer: action.answer,
+      }];
+      const nextIndex = state.intakeIndex + 1;
+      const nextQuestion = state.intakeQuestions[nextIndex];
+      return {
+        ...state,
+        phase: nextQuestion ? WORKFLOW_PHASES.ANSWERING_INTAKE : WORKFLOW_PHASES.PROPOSING,
+        intakeIndex: nextIndex,
+        intakeAnswers,
+        error: null,
+        activity: [
+          ...state.activity,
+          createActivity("user", action.answer, "intake-answer"),
+          ...(nextQuestion ? [createActivity("assistant", nextQuestion.question, "question")] : []),
+        ],
+      };
+    }
 
     case "PROPOSAL_READY":
       return {

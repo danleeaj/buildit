@@ -7,6 +7,7 @@ import {
   prepareGeneratedApp,
   validateGeneratedApp,
 } from "./generatedApp.js";
+import { createPreviewBridgeRuntime } from "./previewBridge.js";
 
 const VALID_APP = `<!DOCTYPE html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -73,5 +74,17 @@ describe("patch parsing", () => {
   test("rejects prose outside patch blocks", () => {
     const result = parsePatchResponse("Done!\n```html:App\n<div data-component=\"App\"></div>\n```");
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("preview bridge capture", () => {
+  test("uses an in-frame SVG capture instead of html2canvas", () => {
+    const runtime = createPreviewBridgeRuntime({
+      sessionId: "session-1",
+      appId: "app-test",
+      mode: "live",
+    });
+    expect(runtime).toContain("foreignObject");
+    expect(runtime).not.toContain("html2canvas");
   });
 });

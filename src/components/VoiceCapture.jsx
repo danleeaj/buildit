@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowIcon, KeyboardIcon, MicrophoneIcon, ProjectsIcon } from "./Icons.jsx";
 
 export default function VoiceCapture({
@@ -39,12 +39,50 @@ export default function VoiceCapture({
 
   if (landing) {
     const showTranscript = speech.listening || voiceBusy || Boolean(liveTranscript);
+    const textareaRef = useRef(null);
+
+    useEffect(() => {
+      if (typing && textareaRef.current) textareaRef.current.focus();
+    }, [typing]);
 
     return (
       <section className={`voice-capture voice-capture-landing ${speech.listening ? "is-listening" : ""}`}>
         <div className="voice-copy landing-copy">
           <h1>{title}</h1>
         </div>
+
+        <div className={`landing-typing-area ${typing ? "is-open" : ""}`}>
+          <form className="landing-typing-form" onSubmit={submit}>
+            <textarea
+              ref={textareaRef}
+              className="landing-textarea"
+              value={textValue}
+              onChange={(event) => onTextValueChange(event.target.value)}
+              rows={3}
+              placeholder="Describe it in your own words"
+              disabled={disabled}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" && !event.shiftKey) {
+                  event.preventDefault();
+                  submit(event);
+                }
+              }}
+            />
+            <button type="submit" className="landing-typing-submit" disabled={!currentValue || disabled || voiceBusy} aria-label={submitLabel}>
+              <ArrowIcon size={18} />
+            </button>
+          </form>
+        </div>
+
+        <div className={`landing-transcript ${showTranscript ? "is-visible" : ""}`} aria-live="polite">
+          {showTranscript && (liveTranscript || (speech.requesting
+            ? "Opening microphone…"
+            : speech.processing
+              ? "Turning your recording into words…"
+              : "Listening…"))}
+        </div>
+
+        {speech.error && <p className="inline-error" role="alert">{speech.error.message}</p>}
 
         <div className="landing-controls">
           <button
@@ -73,42 +111,14 @@ export default function VoiceCapture({
           <button
             type="button"
             className="landing-side-action"
-            onClick={() => setTyping(true)}
+            onClick={() => setTyping(!typing)}
             disabled={disabled || voiceBusy}
-            aria-label="Type your request instead"
+            aria-label={typing ? "Hide keyboard" : "Type your request instead"}
+            aria-pressed={typing}
           >
             <KeyboardIcon size={21} />
           </button>
         </div>
-
-        <div className={`landing-transcript ${showTranscript ? "is-visible" : ""}`} aria-live="polite">
-          {showTranscript && (liveTranscript || (speech.requesting
-            ? "Opening microphone…"
-            : speech.processing
-              ? "Turning your recording into words…"
-              : "Listening…"))}
-        </div>
-
-        {speech.error && <p className="inline-error" role="alert">{speech.error.message}</p>}
-
-        {typing && (
-          <form className="typed-fallback landing-typed-fallback" onSubmit={submit}>
-            <label htmlFor="typed-request">Type your request</label>
-            <textarea
-              id="typed-request"
-              value={textValue}
-              onChange={(event) => onTextValueChange(event.target.value)}
-              rows={3}
-              placeholder="Describe it in your own words"
-              disabled={disabled}
-              autoFocus
-            />
-            <button type="submit" className="primary-action" disabled={!currentValue || disabled || voiceBusy}>
-              <span>{submitLabel}</span>
-              <ArrowIcon size={18} />
-            </button>
-          </form>
-        )}
 
         {!typing && currentValue && !speech.listening && !voiceBusy && (
           <button type="button" className="primary-action landing-submit" onClick={submit} disabled={disabled}>

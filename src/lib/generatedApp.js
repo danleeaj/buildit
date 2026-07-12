@@ -170,7 +170,8 @@ export function parseGeneratedAppResponse(text, { finishReason } = {}) {
   if (errors.length) return failure(errors);
 
   const trimmed = text.trim();
-  const match = trimmed.match(/^```html:app[ \t]*\r?\n([\s\S]*?)\r?\n```$/);
+  // ponytail: tolerate leading/trailing prose the model sometimes adds around the fence
+  const match = trimmed.match(/```html:app[ \t]*\r?\n([\s\S]*?)\r?\n```/);
   if (!match) return failure(["Return exactly one html:app fenced block with no surrounding prose."]);
 
   const html = match[1].trim();

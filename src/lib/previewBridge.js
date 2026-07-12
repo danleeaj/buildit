@@ -1,5 +1,3 @@
-import html2canvasSource from "html2canvas/dist/html2canvas.min.js?raw";
-
 export const PREVIEW_MESSAGE_SOURCE = "superflow-preview";
 export const PARENT_MESSAGE_SOURCE = "superflow-parent";
 
@@ -26,7 +24,7 @@ function serializeDocument(doc) {
   return `<!DOCTYPE html>\n${doc.documentElement.outerHTML}`;
 }
 
-function createBridgeRuntime({ sessionId, appId, mode }) {
+export function createPreviewBridgeRuntime({ sessionId, appId, mode }) {
   const config = JSON.stringify({ sessionId, appId, mode }).replaceAll("<", "\\u003c");
 
   return `(() => {
@@ -68,6 +66,54 @@ function createBridgeRuntime({ sessionId, appId, mode }) {
       }),
     });
 
+    const capturePreview = () => new Promise((resolve, reject) => {
+      let objectUrl = "";
+      try {
+        const width = Math.max(1, document.documentElement.clientWidth || window.innerWidth);
+        const height = Math.max(1, window.innerHeight || document.documentElement.clientHeight);
+        const copy = document.documentElement.cloneNode(true);
+        copy.querySelectorAll("script, meta[http-equiv='Content-Security-Policy']").forEach((element) => element.remove());
+        copy.setAttribute("xmlns", "http://www.w3.org/1999/xhtml");
+
+        const markup = new XMLSerializer().serializeToString(copy);
+        const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '"><foreignObject width="100%" height="100%">' + markup + "</foreignObject></svg>";
+        objectUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+
+        const image = new Image();
+        image.onload = () => {
+          try {
+            const canvas = document.createElement("canvas");
+            canvas.width = width;
+            canvas.height = height;
+            const context = canvas.getContext("2d");
+            if (!context) throw new Error("Screenshot canvas is unavailable");
+            context.drawImage(image, 0, 0, width, height);
+            resolve({
+              dataUrl: canvas.toDataURL("image/png"),
+              width,
+              height,
+              viewportWidth: width,
+              viewportHeight: height,
+              scrollX: window.scrollX,
+              scrollY: window.scrollY,
+            });
+          } catch (error) {
+            reject(error instanceof Error ? error : new Error(String(error)));
+          } finally {
+            URL.revokeObjectURL(objectUrl);
+          }
+        };
+        image.onerror = () => {
+          URL.revokeObjectURL(objectUrl);
+          reject(new Error("Could not capture the generated app."));
+        };
+        image.src = objectUrl;
+      } catch (error) {
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      }
+    });
+
     window.addEventListener("message", async (event) => {
       const message = event.data;
       if (event.source !== window.parent || !message || message.source !== "${PARENT_MESSAGE_SOURCE}" || message.sessionId !== CONFIG.sessionId) return;
@@ -102,31 +148,11 @@ function createBridgeRuntime({ sessionId, appId, mode }) {
         }
 
         if (message.action === "capture") {
-          if (typeof window.html2canvas !== "function") throw new Error("Screenshot bridge unavailable");
-          const canvas = await window.html2canvas(document.documentElement, {
-            backgroundColor: "#ffffff",
-            scale: 1,
-            useCORS: false,
-            logging: false,
-            width: document.documentElement.clientWidth,
-            height: window.innerHeight,
-            windowWidth: document.documentElement.clientWidth,
-            windowHeight: window.innerHeight,
-            scrollX: 0,
-            scrollY: -window.scrollY,
-          });
+          const capture = await capturePreview();
           send("response", {
             requestId: message.requestId,
             ok: true,
-            value: {
-              dataUrl: canvas.toDataURL("image/png"),
-              width: canvas.width,
-              height: canvas.height,
-              viewportWidth: document.documentElement.clientWidth,
-              viewportHeight: window.innerHeight,
-              scrollX: window.scrollX,
-              scrollY: window.scrollY,
-            },
+            value: capture,
           });
           return;
         }
@@ -158,10 +184,11 @@ function createBridgeRuntime({ sessionId, appId, mode }) {
 
     const announceReady = () => {
       send("ready");
-      requestAnimationFrame(() => {
-        send("heartbeat", { index: 1 });
-        nativeSetTimeout(() => send("heartbeat", { index: 2 }), 250);
-      });
+      // Staging runs in an off-screen iframe, where animation frames may be
+      // deferred indefinitely. Heartbeats are diagnostic only, so do not make
+      // them depend on the rendering scheduler.
+      nativeSetTimeout(() => send("heartbeat", { index: 1 }), 0);
+      nativeSetTimeout(() => send("heartbeat", { index: 2 }), 250);
     };
 
     if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", announceReady, { once: true });
@@ -190,15 +217,11 @@ export function assemblePreviewDocument(html, { appId, sessionId, mode = "live" 
   const behaviorScripts = [...doc.querySelectorAll("script[data-behavior-region]")];
   behaviorScripts.forEach((script) => script.remove());
 
-  const captureLibrary = doc.createElement("script");
-  captureLibrary.setAttribute("data-superflow-bridge-library", "html2canvas");
-  captureLibrary.textContent = html2canvasSource;
-
   const bridge = doc.createElement("script");
   bridge.setAttribute("data-superflow-bridge", "true");
-  bridge.textContent = createBridgeRuntime({ sessionId, appId, mode });
+  bridge.textContent = createPreviewBridgeRuntime({ sessionId, appId, mode });
 
-  doc.head.append(captureLibrary, bridge);
+  doc.head.append(bridge);
   behaviorScripts.forEach((script) => doc.body.append(script));
 
   return serializeDocument(doc);
@@ -226,7 +249,6 @@ export function stagePreviewDocument(html, { appId, timeoutMs = 1500 } = {}) {
   });
 
   return new Promise((resolve) => {
-    let heartbeatCount = 0;
     let settled = false;
 
     const finish = (result) => {
@@ -242,13 +264,30 @@ export function stagePreviewDocument(html, { appId, timeoutMs = 1500 } = {}) {
       if (event.source !== iframe.contentWindow) return;
       const message = event.data;
       if (!message || message.source !== PREVIEW_MESSAGE_SOURCE || message.sessionId !== sessionId) return;
+
+      // ponytail: respond to storage requests with empty defaults during staging
+      // so generated apps that hydrate on load don't crash the health-check.
+      if (message.type === "storage-request") {
+        iframe.contentWindow.postMessage({
+          source: PARENT_MESSAGE_SOURCE,
+          sessionId,
+          type: "storage-result",
+          requestId: message.requestId,
+          ok: true,
+          value: message.operation === "get" ? undefined : null,
+        }, "*");
+        return;
+      }
+
       if (message.type === "runtime-error") {
         finish({ ok: false, errors: [message.error || "Generated app failed during staging"] });
         return;
       }
-      if (message.type === "heartbeat") {
-        heartbeatCount += 1;
-        if (heartbeatCount >= 2) finish({ ok: true, value: { appId, html } });
+      // `ready` is sent after DOMContentLoaded, which means the bridge and
+      // generated behavior scripts have loaded. Do not wait for animation
+      // frames: browsers can throttle those in an off-screen staging iframe.
+      if (message.type === "ready") {
+        finish({ ok: true, value: { appId, html } });
       }
     };
 

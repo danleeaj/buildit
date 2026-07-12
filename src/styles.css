@@ -1,6 +1,8 @@
 :root {
   color-scheme: light;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display: "Iowan Old Style", Baskerville, "Times New Roman", serif;
+  font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   --canvas: #ffffff;
@@ -33,7 +35,7 @@ body {
   min-width: 320px;
   min-height: 100dvh;
   overflow-x: hidden;
-  background: var(--canvas);
+  background: #fcfcf9;
   color: var(--ink);
 }
 
@@ -64,11 +66,24 @@ input:disabled {
 
 .app-shell {
   min-height: 100dvh;
-  background: var(--canvas);
+  position: relative;
+  isolation: isolate;
+  background: transparent;
+}
+
+.hyperspace-background {
+  position: fixed;
+  z-index: 0;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  pointer-events: none;
 }
 
 .workspace {
   min-height: 100dvh;
+  position: relative;
+  z-index: 1;
 }
 
 .input-rail {
@@ -80,7 +95,9 @@ input:disabled {
     max(18px, env(safe-area-inset-right))
     max(18px, env(safe-area-inset-bottom))
     max(18px, env(safe-area-inset-left));
-  background: var(--canvas);
+  background: rgb(255 255 252 / 0.4);
+  backdrop-filter: blur(1px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .rail-inner {
@@ -114,7 +131,7 @@ input:disabled {
 }
 
 .entry-brand-row .brand-wordmark {
-  font-family: Georgia, "Times New Roman", serif;
+  font-family: var(--font-display);
   font-size: clamp(26px, 7vw, 34px);
   font-style: italic;
   font-weight: 500;
@@ -176,6 +193,57 @@ input:disabled {
   width: 100%;
 }
 
+.intake-screen {
+  width: 100%;
+  display: grid;
+  gap: 16px;
+}
+
+.intake-screen h1 {
+  max-width: 17ch;
+  margin: 0;
+  font: 500 clamp(31px, 8vw, 45px) / 0.98 Georgia, "Times New Roman", serif;
+  letter-spacing: -0.055em;
+}
+
+.intake-copy {
+  max-width: 37ch;
+  margin: -4px 0 4px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.intake-options {
+  display: grid;
+  gap: 10px;
+}
+
+.intake-option {
+  min-height: 58px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgb(255 255 252 / 0.82);
+  color: var(--ink);
+  text-align: left;
+  font: inherit;
+  font-weight: 650;
+  transition: transform 160ms var(--ease-out), border-color 160ms var(--ease-out), background 160ms var(--ease-out);
+}
+
+.intake-option:hover:not(:disabled),
+.intake-option:focus-visible {
+  border-color: var(--ink);
+  background: white;
+  transform: translateX(3px);
+}
+
+.intake-other,
+.intake-back {
+  justify-self: start;
+}
+
 .entry-flow {
   position: relative;
   flex: 1 1 0;
@@ -204,7 +272,9 @@ input:disabled {
   overflow: auto;
   transform: translateY(104%);
   opacity: 0;
-  background: var(--canvas);
+  background: rgb(255 255 252 / 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   pointer-events: none;
 }
 
@@ -244,6 +314,7 @@ input:disabled {
 
 .voice-capture-landing .landing-copy {
   justify-self: start;
+  padding-inline: clamp(16px, 5vw, 40px);
 }
 
 .landing-copy {
@@ -254,7 +325,7 @@ input:disabled {
 
 .landing-copy h1 {
   max-width: 14ch;
-  font-family: "Iowan Old Style", Baskerville, "Times New Roman", serif;
+  font-family: var(--font-display);
   font-size: clamp(35px, 9vw, 54px);
   font-style: normal;
   font-weight: 500;
@@ -265,6 +336,72 @@ input:disabled {
 .voice-capture-landing.is-listening .landing-copy {
   transform: translateY(-12px) scale(0.78);
   opacity: 0.7;
+}
+
+.landing-typing-area {
+  width: min(100%, 380px);
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-top: 0;
+  transition: grid-template-rows 320ms var(--ease-out), opacity 260ms var(--ease-out), margin-top 320ms var(--ease-out);
+}
+
+.landing-typing-area.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-top: clamp(20px, 4dvh, 36px);
+}
+
+.landing-typing-form {
+  overflow: hidden;
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  padding: 10px 12px;
+  background: var(--surface);
+  transition: border-color 160ms var(--ease-out);
+}
+
+.landing-typing-form:focus-within {
+  border-color: var(--ink-soft);
+}
+
+.landing-textarea {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  resize: none;
+  outline: none;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.landing-textarea::placeholder {
+  color: var(--muted);
+}
+
+.landing-typing-submit {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--ink);
+  color: white;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: pointer;
+  transition: opacity 160ms var(--ease-out);
+}
+
+.landing-typing-submit:disabled {
+  opacity: 0.3;
+  cursor: default;
 }
 
 .landing-controls {
@@ -334,11 +471,13 @@ input:disabled {
 .landing-transcript {
   width: min(100%, 360px);
   min-height: 25px;
-  margin-top: 26px;
+  margin-top: 18px;
   color: var(--muted);
-  font-size: 14px;
+  font-size: 17px;
   line-height: 1.5;
-  text-align: center;
+  text-align: left;
+  justify-self: start;
+  padding-inline: clamp(16px, 5vw, 40px);
   opacity: 0;
   transform: translateY(-6px);
   transition: opacity 180ms var(--ease-out), transform 180ms var(--ease-out);
@@ -355,7 +494,7 @@ input:disabled {
 }
 
 .landing-submit {
-  margin-top: 22px;
+  margin-top: 14px;
 }
 
 .projects-placeholder {
@@ -383,7 +522,9 @@ input:disabled {
 
 .projects-heading h1 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: clamp(39px, 10vw, 58px);
+  font-weight: 500;
   line-height: 0.96;
   letter-spacing: -0.06em;
 }
@@ -405,7 +546,9 @@ input:disabled {
 
 .project-placeholder-card h2 {
   margin: 28px 0 0;
+  font-family: var(--font-display);
   font-size: 23px;
+  font-weight: 500;
   letter-spacing: -0.035em;
 }
 
@@ -437,7 +580,9 @@ input:disabled {
 .error-panel h1 {
   max-width: 12ch;
   margin: 0;
+  font-family: var(--font-display);
   font-size: clamp(34px, 9vw, 52px);
+  font-weight: 500;
   line-height: 0.98;
   letter-spacing: -0.052em;
 }
@@ -691,7 +836,9 @@ input:disabled {
 
 .progress-title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: clamp(29px, 7vw, 42px);
+  font-weight: 500;
   line-height: 1.04;
   letter-spacing: -0.04em;
 }
@@ -752,8 +899,9 @@ input:disabled {
 
 .activity-header h2 {
   margin: 0;
+  font-family: var(--font-display);
   font-size: 13px;
-  font-weight: 650;
+  font-weight: 500;
 }
 
 .activity-list {
@@ -784,7 +932,9 @@ input:disabled {
 .preview-area {
   position: relative;
   min-height: 100dvh;
-  background: var(--surface-strong);
+  background: rgb(244 244 242 / 0.4);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
 }
 
 .device-frame {

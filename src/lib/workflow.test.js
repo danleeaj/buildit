@@ -11,9 +11,48 @@ describe("workflowReducer", () => {
       type: "PROBLEM_SUBMITTED",
       problem: "Our badminton group forgets who paid.",
     });
-    expect(next.phase).toBe(WORKFLOW_PHASES.PROPOSING);
+    expect(next.phase).toBe(WORKFLOW_PHASES.DISCOVERING);
     expect(next.problem).toContain("badminton");
     expect(next.activity).toHaveLength(1);
+  });
+
+  test("can skip intake and continue directly to a proposal", () => {
+    const submitted = workflowReducer(createInitialWorkflow(), {
+      type: "PROBLEM_SUBMITTED",
+      problem: "Help me track our badminton court payments.",
+    });
+    const next = workflowReducer(submitted, { type: "INTAKE_SKIPPED" });
+    expect(next.phase).toBe(WORKFLOW_PHASES.PROPOSING);
+    expect(next.intakeQuestions).toEqual([]);
+  });
+
+  test("keeps two intake answers before proposing", () => {
+    const questions = [
+      { id: "priority", question: "What matters most?", options: ["A", "B"] },
+      { id: "rhythm", question: "How often?", options: ["Daily", "Weekly"] },
+    ];
+    const submitted = workflowReducer(createInitialWorkflow(), {
+      type: "PROBLEM_SUBMITTED",
+      problem: "I need help with my budget.",
+    });
+    const ready = workflowReducer(submitted, { type: "INTAKE_READY", questions });
+    const first = workflowReducer(ready, {
+      type: "INTAKE_ANSWERED",
+      question: questions[0],
+      answer: "A",
+    });
+    const final = workflowReducer(first, {
+      type: "INTAKE_ANSWERED",
+      question: questions[1],
+      answer: "Weekly",
+    });
+    expect(first.phase).toBe(WORKFLOW_PHASES.ANSWERING_INTAKE);
+    expect(first.intakeIndex).toBe(1);
+    expect(final.phase).toBe(WORKFLOW_PHASES.PROPOSING);
+    expect(final.intakeAnswers).toEqual([
+      { id: "priority", question: "What matters most?", answer: "A" },
+      { id: "rhythm", question: "How often?", answer: "Weekly" },
+    ]);
   });
 
   test("restores a previous valid app", () => {

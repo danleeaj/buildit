@@ -12,6 +12,8 @@ import {
   RetryIcon,
 } from "./components/Icons.jsx";
 import CompletionActions from "./components/CompletionActions.jsx";
+import HyperspaceBackground from "./components/HyperspaceBackground.jsx";
+import IntakeQuestion from "./components/IntakeQuestion.jsx";
 import MarketPane from "./components/MarketPane.jsx";
 import PreviewFrame from "./components/PreviewFrame.jsx";
 import ProjectsPlaceholder from "./components/ProjectsPlaceholder.jsx";
@@ -30,8 +32,10 @@ import {
 } from "./lib/generatedApp.js";
 import {
   editApp,
+  discover,
   generateApp,
   isApiConfigured,
+  parseDiscoveryResponse,
   propose,
   repairGeneratedApp,
 } from "./lib/llm.js";
@@ -101,6 +105,7 @@ function appTitleFromHtml(html) {
 
 function progressContent(phase) {
   const content = {
+    [WORKFLOW_PHASES.DISCOVERING]: ["Understanding what matters", "Checking whether one small decision will make the app substantially more useful."],
     [WORKFLOW_PHASES.PROPOSING]: ["Shaping the idea", "Turning your problem into one focused app."],
     [WORKFLOW_PHASES.GENERATING]: ["Building your app", "Creating the interface, behavior, and useful starting details."],
     [WORKFLOW_PHASES.VALIDATING]: ["Making sure it works", "Checking the app before it reaches your screen."],
@@ -111,17 +116,41 @@ function progressContent(phase) {
 }
 
 async function validateModelDocument(modelResult, appId) {
+  console.group("[Superflow] validateModelDocument");
+  console.info("Model response:", {
+    finishReason: modelResult.finishReason,
+    textLength: modelResult.text?.length,
+    model: modelResult.model,
+    usage: modelResult.usage,
+  });
+
   const parsed = parseGeneratedAppResponse(modelResult.text, {
     finishReason: modelResult.finishReason,
   });
-  if (!parsed.ok) return parsed;
+  if (!parsed.ok) {
+    console.warn("Parse failed:", parsed.errors);
+    console.groupEnd();
+    return parsed;
+  }
+  console.info("Parse OK", { byteLength: parsed.value?.byteLength, warnings: parsed.warnings });
 
   const prepared = prepareGeneratedApp(resultHtml(parsed), { appId });
-  if (!prepared.ok) return prepared;
+  if (!prepared.ok) {
+    console.warn("Prepare/validate failed:", prepared.errors);
+    console.groupEnd();
+    return prepared;
+  }
+  console.info("Prepare OK");
 
   const html = resultHtml(prepared);
-  const staged = await stagePreviewDocument(html, { appId, timeoutMs: 2200 });
-  if (!staged.ok) return staged;
+  const staged = await stagePreviewDocument(html, { appId, timeoutMs: 4000 });
+  if (!staged.ok) {
+    console.warn("Staging failed:", staged.errors);
+    console.groupEnd();
+    return staged;
+  }
+  console.info("Staging OK");
+  console.groupEnd();
   return { ok: true, value: { html, appId } };
 }
 
@@ -132,7 +161,7 @@ function ProgressPanel({ phase }) {
     { key: "build", label: "Create the app" },
     { key: "check", label: "Check the result" },
   ];
-  const activeIndex = phase === WORKFLOW_PHASES.PROPOSING
+  const activeIndex = phase === WORKFLOW_PHASES.DISCOVERING || phase === WORKFLOW_PHASES.PROPOSING
     ? 0
     : phase === WORKFLOW_PHASES.GENERATING || phase === WORKFLOW_PHASES.EDITING
       ? 1
@@ -244,11 +273,47 @@ export default function App() {
     setDraft("");
     dispatch({ type: "PROBLEM_SUBMITTED", problem: cleanProblem });
     try {
+      const discovery = await discover({ history, problem: cleanProblem });
+      const questions = parseDiscoveryResponse(discovery.text);
+      if (questions.length) {
+        dispatch({ type: "INTAKE_READY", questions });
+        operationRef.current = false;
+        return;
+      }
+
+      dispatch({ type: "INTAKE_SKIPPED" });
       const response = await propose(history, cleanProblem);
       dispatch({ type: "PROPOSAL_READY", proposal: response.text.trim() });
       operationRef.current = false;
     } catch (error) {
       reportError(error, WORKFLOW_PHASES.IDLE);
+    }
+  }
+
+  async function submitIntakeAnswer(answer) {
+    const cleanAnswer = answer.trim();
+    const question = state.intakeQuestions[state.intakeIndex];
+    if (!cleanAnswer || !question || operationRef.current) return;
+
+    speech.stop();
+    speech.reset();
+    setDraft("");
+    const intakeAnswers = [...state.intakeAnswers, {
+      id: question.id,
+      question: question.question,
+      answer: cleanAnswer,
+    }];
+    const isLastQuestion = state.intakeIndex === state.intakeQuestions.length - 1;
+    dispatch({ type: "INTAKE_ANSWERED", question, answer: cleanAnswer });
+    if (!isLastQuestion) return;
+
+    operationRef.current = true;
+    try {
+      const response = await propose(history, state.problem, intakeAnswers);
+      dispatch({ type: "PROPOSAL_READY", proposal: response.text.trim() });
+      operationRef.current = false;
+    } catch (error) {
+      reportError(error, WORKFLOW_PHASES.ANSWERING_INTAKE);
     }
   }
 
@@ -266,28 +331,52 @@ export default function App() {
     const appId = mintAppId();
 
     try {
+      console.group("[Superflow] approveProposal");
+      console.info("Starting generation", { appId, problem: state.problem });
+
       const firstResponse = await generateApp({
         history,
         problem: state.problem,
         proposal: state.proposal,
       });
+      console.info("First generation response received");
       dispatch({ type: "VALIDATION_STARTED" });
       let candidate = await validateModelDocument(firstResponse, appId);
 
       if (!candidate.ok) {
+        console.warn("First attempt failed, trying repair", { errors: candidate.errors });
+        // ponytail: repair with targeted errors and trimmed candidate context
         const repairResponse = await repairGeneratedApp({
           history,
           problem: state.problem,
           proposal: state.proposal,
-          candidate: firstResponse.text.slice(0, 40000),
-          errors: resultErrors(candidate, "The app document was incomplete."),
+          candidate: firstResponse.text,
+          errors: resultErrors(candidate, "The app document was incomplete or malformed."),
         });
+        console.info("Repair response received");
         candidate = await validateModelDocument(repairResponse, appId);
       }
 
       if (!candidate.ok) {
+        console.warn("Repair failed, trying fresh generation", { errors: candidate.errors });
+        // ponytail: one more fresh attempt with no broken candidate context
+        const freshResponse = await generateApp({
+          history,
+          problem: state.problem,
+          proposal: state.proposal,
+        });
+        console.info("Fresh generation response received");
+        candidate = await validateModelDocument(freshResponse, appId);
+      }
+
+      if (!candidate.ok) {
+        console.error("All attempts failed", { errors: candidate.errors });
+        console.groupEnd();
         throw new Error("I could not make a dependable app from that attempt. Try the same problem once more.");
       }
+
+      console.info("Generation succeeded");
+      console.groupEnd();
 
       const html = candidate.value.html;
       const nextProjectSnapshot = createProjectSnapshot({
@@ -378,20 +467,46 @@ export default function App() {
         component: state.pendingDrawing?.component || null,
         instruction: cleanInstruction,
       });
+      console.group("[Superflow] submitEdit");
+      console.info("Edit response:", {
+        finishReason: response.finishReason,
+        textLength: response.text?.length,
+        model: response.model,
+        usage: response.usage,
+        component: state.pendingDrawing?.component || null,
+        instruction: cleanInstruction,
+      });
+
       const parsed = parsePatchResponse(response.text, {
         finishReason: response.finishReason,
       });
-      if (!parsed.ok) throw new Error(resultErrors(parsed, "The change was incomplete.")[0]);
+      if (!parsed.ok) {
+        console.warn("Patch parse failed:", parsed.errors);
+        console.groupEnd();
+        throw new Error(resultErrors(parsed, "The change was incomplete.")[0]);
+      }
+      console.info("Patch parsed OK", { blocks: parsed.value.blocks.map(b => `${b.type}:${b.name}`) });
 
       const applied = applyGeneratedAppPatches(state.html, parsed.value, {
         appId: state.appId,
       });
-      if (!applied.ok) throw new Error(resultErrors(applied, "The change did not fit the app.")[0]);
+      if (!applied.ok) {
+        console.warn("Patch apply failed:", applied.errors);
+        console.groupEnd();
+        throw new Error(resultErrors(applied, "The change did not fit the app.")[0]);
+      }
+      console.info("Patch applied OK");
 
       dispatch({ type: "EDIT_VALIDATION_STARTED" });
       const html = resultHtml(applied);
-      const staged = await stagePreviewDocument(html, { appId: state.appId, timeoutMs: 2200 });
-      if (!staged.ok) throw new Error(resultErrors(staged, "The changed app did not start cleanly.")[0]);
+      const staged = await stagePreviewDocument(html, { appId: state.appId, timeoutMs: 4000 });
+      if (!staged.ok) {
+        console.warn("Edit staging failed:", staged.errors);
+        console.groupEnd();
+        throw new Error(resultErrors(staged, "The changed app did not start cleanly.")[0]);
+      }
+      console.info("Edit staging OK");
+      console.groupEnd();
 
       const nextProjectSnapshot = createProjectSnapshot({
         appId: state.appId,
@@ -450,6 +565,17 @@ export default function App() {
   const isEditing = state.phase === WORKFLOW_PHASES.EDITING
     || state.phase === WORKFLOW_PHASES.VALIDATING_EDIT;
   const showPreviewError = hasApp && state.phase === WORKFLOW_PHASES.ERROR;
+  const hyperspaceWorkload = speech.requesting
+    || speech.listening
+    || speech.processing
+    || [
+      WORKFLOW_PHASES.PROPOSING,
+      WORKFLOW_PHASES.DISCOVERING,
+      WORKFLOW_PHASES.GENERATING,
+      WORKFLOW_PHASES.VALIDATING,
+      WORKFLOW_PHASES.EDITING,
+      WORKFLOW_PHASES.VALIDATING_EDIT,
+    ].includes(state.phase);
 
   const railMain = (() => {
     if (state.phase === WORKFLOW_PHASES.ERROR && !hasApp) {
@@ -502,7 +628,26 @@ export default function App() {
       );
     }
 
+    if (state.phase === WORKFLOW_PHASES.ANSWERING_INTAKE) {
+      const question = state.intakeQuestions[state.intakeIndex];
+      if (question) {
+        return (
+          <IntakeQuestion
+            question={question}
+            index={state.intakeIndex}
+            total={state.intakeQuestions.length}
+            speech={speech}
+            textValue={draft}
+            onTextValueChange={setDraft}
+            onAnswer={submitIntakeAnswer}
+            disabled={!connectivity.isOnline || operationRef.current}
+          />
+        );
+      }
+    }
+
     if ([
+      WORKFLOW_PHASES.DISCOVERING,
       WORKFLOW_PHASES.PROPOSING,
       WORKFLOW_PHASES.GENERATING,
       WORKFLOW_PHASES.VALIDATING,
@@ -561,6 +706,7 @@ export default function App() {
 
   return (
     <main className="app-shell">
+      <HyperspaceBackground workload={hyperspaceWorkload} />
       {!connectivity.isOnline && (
         <div className="offline-banner" role="status">
           <OfflineIcon size={17} /> Offline. Your current app still works.
