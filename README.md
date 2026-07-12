@@ -12,6 +12,10 @@ bun run dev
 
 Add a working OpenAI API key to `.env`, then open the local URL printed by Vite.
 
+## Neon persistence
+
+For authenticated projects, connect Neon to Vercel, enable Neon Auth, and add the values in `.env.example` to Vercel and your local `.env`. Run `bun run db:migrate`, create the demo user in Neon Auth, set its ID as `DEMO_OWNER_ID`, then run `bun run db:seed-demo`. Add your Vercel URL to Neon Auth's allowed origins before testing Google sign-in.
+
 ## Voice input
 
 Voice capture uses `MediaRecorder` first and sends the finished recording to OpenAI's transcription endpoint. Tap **Tap to speak**, allow microphone access, speak, then tap again to finish. The transcript appears after processing. Browser speech recognition is used only when recorded audio is unavailable.

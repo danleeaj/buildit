@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 function loadImage(dataUrl) {
   return new Promise((resolve, reject) => {
@@ -9,7 +9,14 @@ function loadImage(dataUrl) {
   });
 }
 
-export default function DrawOverlay({ previewRef, onDone, onCancel, onError }) {
+const DrawOverlay = forwardRef(function DrawOverlay({
+  previewRef,
+  onDone,
+  onCancel,
+  onError,
+  error,
+  hint = "Circle or underline the part you want to change.",
+}, ref) {
   const canvasRef = useRef(null);
   const points = useRef([]);
   const drawing = useRef(false);
@@ -68,11 +75,11 @@ export default function DrawOverlay({ previewRef, onDone, onCancel, onError }) {
     setHasInk(false);
   };
 
-  async function finish() {
-    if (points.current.length < 2 || !previewRef.current) return;
-    setFinishing(true);
-    try {
-      const samples = points.current;
+  async function captureDrawing() {
+    if (points.current.length < 2) return null;
+    if (!previewRef.current) throw new Error("The app preview is not ready yet.");
+
+    const samples = points.current;
       const centroid = samples.reduce(
         (total, point) => ({ x: total.x + point.x, y: total.y + point.y }),
         { x: 0, y: 0 },
@@ -107,11 +114,24 @@ export default function DrawOverlay({ previewRef, onDone, onCancel, onError }) {
       });
       context.stroke();
 
-      onDone({
-        component: hit.component,
-        componentRect: hit.rect,
-        screenshotDataUrl: output.toDataURL("image/png"),
-      });
+    return {
+      component: hit.component,
+      componentRect: hit.rect,
+      screenshotDataUrl: output.toDataURL("image/png"),
+    };
+  }
+
+  useImperativeHandle(ref, () => ({
+    capture: captureDrawing,
+    clear,
+  }));
+
+  async function finish() {
+    if (!hasInk || !onDone) return;
+    setFinishing(true);
+    try {
+      const drawingData = await captureDrawing();
+      if (drawingData) onDone(drawingData);
     } catch (error) {
       onError?.(error instanceof Error ? error.message : String(error));
     } finally {
@@ -138,16 +158,21 @@ export default function DrawOverlay({ previewRef, onDone, onCancel, onError }) {
         <button type="button" className="icon-action" onClick={clear} disabled={!hasInk || finishing}>
           Clear
         </button>
-        <button
-          type="button"
-          className="primary-action compact"
-          onClick={finish}
-          disabled={!hasInk || finishing}
-        >
-          {finishing ? "Reading mark…" : "Use mark"}
-        </button>
+        {onDone && (
+          <button
+            type="button"
+            className="primary-action compact"
+            onClick={finish}
+            disabled={!hasInk || finishing}
+          >
+            {finishing ? "Reading mark…" : "Use mark"}
+          </button>
+        )}
       </div>
-      <p className="draw-hint">Circle or underline the part you want to change.</p>
+      {error && <p className="draw-error" role="alert">{error}</p>}
+      <p className="draw-hint">{hint}</p>
     </div>
   );
-}
+});
+
+export default DrawOverlay;

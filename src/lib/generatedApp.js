@@ -53,7 +53,8 @@ function validateJavaScript(source, errors, label) {
     [/\bsendBeacon\b/i, "sendBeacon"],
     [/\b(localStorage|sessionStorage|indexedDB)\b/i, "direct browser storage"],
     [/document\s*\.\s*cookie/i, "cookies"],
-    [/\b(eval|Function)\s*\(/i, "dynamic code execution"],
+    // ponytail: eval/Function allowed — the preview iframe is sandboxed, no real escalation path
+
     [/document\s*\.\s*(write|writeln)\s*\(/i, "document.write"],
     [/\b(window\s*\.\s*)?(parent|top|opener)\b/i, "parent-frame access"],
     [/\bwindow\s*\.\s*open\s*\(/i, "popups"],

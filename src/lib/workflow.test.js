@@ -61,6 +61,22 @@ describe("workflowReducer", () => {
     expect(state.appId).toBe("app-1");
   });
 
+  test("loads a persisted project into a ready workflow", () => {
+    const next = workflowReducer(createInitialWorkflow(), {
+      type: "PROJECT_LOADED",
+      project: {
+        id: "project-1",
+        html: "<!doctype html><html><head></head><body></body></html>",
+        problem: "Track court costs.",
+        config: { appId: "app-court" },
+        conversation: [{ id: "seed", role: "system", text: "Demo", kind: "status" }],
+      },
+    });
+    expect(next.phase).toBe(WORKFLOW_PHASES.READY);
+    expect(next.appId).toBe("app-court");
+    expect(next.activity).toHaveLength(1);
+  });
+
   test("an error returns to the preserved ready app", () => {
     const ready = createInitialWorkflow({ appId: "app-1", html: "valid" });
     const failed = workflowReducer(ready, { type: "ERROR", error: "No connection" });

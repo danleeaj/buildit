@@ -6,3 +6,5 @@ dist
 # Superpowers brainstorm artifacts
 .superpowers/
 docs/superpowers/
+.vercel
+.env*

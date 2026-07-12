@@ -150,6 +150,24 @@ export function workflowReducer(state, action) {
           : state.activity,
       };
 
+    case "PROJECT_LOADED": {
+      const project = action.project;
+      const snapshot = project.config && typeof project.config === "object" ? project.config : null;
+      return {
+        ...state,
+        phase: WORKFLOW_PHASES.READY,
+        activity: Array.isArray(project.conversation) ? project.conversation : [],
+        problem: project.problem || snapshot?.originalProblem || "",
+        proposal: snapshot?.approvedSolution || "",
+        html: project.html,
+        appId: snapshot?.appId || project.id || `app-${Date.now().toString(36)}`,
+        projectSnapshot: snapshot,
+        pendingDrawing: null,
+        error: null,
+        resumePhase: WORKFLOW_PHASES.READY,
+      };
+    }
+
     case "DRAWING_STARTED":
       return { ...state, phase: WORKFLOW_PHASES.DRAWING, error: null };
 

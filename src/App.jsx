@@ -3,7 +3,6 @@ import DrawOverlay from "./components/DrawOverlay.jsx";
 import {
   BackIcon,
   CloseIcon,
-  DoneIcon,
   DrawIcon,
   InstallIcon,
   KeyboardIcon,
@@ -46,6 +45,8 @@ import {
   getConnectivityState,
   subscribeToConnectivity,
 } from "./lib/pwa.js";
+import { apiRequest } from "./lib/apiClient.js";
+import { useAuthSession } from "./lib/authClient.js";
 import {
   WORKFLOW_PHASES,
   createInitialWorkflow,
@@ -183,11 +184,11 @@ function ProgressPanel({ phase }) {
   );
 }
 
-export default function App() {
+export default function App({ demoMode = false, onLeaveDemo }) {
   const [state, dispatch] = useReducer(
     workflowReducer,
     undefined,
-    () => createInitialWorkflow(readLastApp()),
+    createInitialWorkflow,
   );
   const [draft, setDraft] = useState("");
   const [previewReady, setPreviewReady] = useState(false);
@@ -203,7 +204,16 @@ export default function App() {
   const [deployNotice, setDeployNotice] = useState("");
   const [mobileCompletionOpen, setMobileCompletionOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const [voiceDrawing, setVoiceDrawing] = useState(false);
+  const [voiceFinishRequested, setVoiceFinishRequested] = useState(false);
+  const [voiceDrawingError, setVoiceDrawingError] = useState("");
+  const [demoLoadError, setDemoLoadError] = useState("");
+  const [projects, setProjects] = useState([]);
+  const [projectsError, setProjectsError] = useState("");
+  const [activeProjectId, setActiveProjectId] = useState(null);
+  const [shareNotice, setShareNotice] = useState("");
   const previewRef = useRef(null);
+  const drawOverlayRef = useRef(null);
   const operationRef = useRef(false);
   const approvalHandledRef = useRef("");
   const runtimeErrorRef = useRef("");
@@ -211,6 +221,7 @@ export default function App() {
     language: "en-SG",
     transcribe: isAudioTranscriptionConfigured() ? transcribeAudio : null,
   });
+  const { user } = useAuthSession();
 
   const history = useMemo(
     () => conversationHistory(state.activity),
@@ -230,6 +241,29 @@ export default function App() {
   }, [state.appId, state.html, state.problem, state.projectSnapshot, state.proposal]);
 
   useEffect(() => subscribeToConnectivity(setConnectivity), []);
+
+  useEffect(() => {
+    if (!demoMode) return undefined;
+    let cancelled = false;
+    fetch("/api/demo")
+      .then((response) => response.ok ? response.json() : Promise.reject(new Error("The demo account is not ready yet.")))
+      .then(({ project }) => {
+        if (!cancelled) dispatch({ type: "PROJECT_LOADED", project });
+      })
+      .catch((error) => {
+        if (!cancelled) setDemoLoadError(error instanceof Error ? error.message : "The demo account is not ready yet.");
+      });
+    return () => { cancelled = true; };
+  }, [demoMode]);
+
+  useEffect(() => {
+    if (!user || demoMode) return undefined;
+    let cancelled = false;
+    apiRequest("/api/projects")
+      .then(({ projects: loaded }) => { if (!cancelled) setProjects(loaded); })
+      .catch((error) => { if (!cancelled) setProjectsError(error.message); });
+    return () => { cancelled = true; };
+  }, [demoMode, user?.id]);
 
   useEffect(() => {
     const controller = createInstallController();
@@ -255,10 +289,86 @@ export default function App() {
     if (REJECTION_PATTERN.test(spoken)) startNewApp();
   }, [speech.finalTranscript, state.phase]);
 
+  useEffect(() => {
+    if (!voiceDrawing || !voiceFinishRequested) return;
+    if (speech.requesting || speech.listening || speech.processing) return;
+
+    if (speech.error) {
+      setVoiceFinishRequested(false);
+      setVoiceDrawingError(speech.error.message);
+      return;
+    }
+
+    const instruction = speech.finalTranscript.trim();
+    if (!instruction) {
+      setVoiceFinishRequested(false);
+      setVoiceDrawingError("I could not hear an instruction. Tap the recording button to try again.");
+      return;
+    }
+
+    setVoiceFinishRequested(false);
+    void (async () => {
+      try {
+        const drawing = await drawOverlayRef.current?.capture();
+        setVoiceDrawing(false);
+        await submitEdit(instruction, drawing);
+      } catch (error) {
+        setVoiceDrawingError(error instanceof Error ? error.message : String(error));
+      }
+    })();
+  }, [speech.error, speech.finalTranscript, speech.listening, speech.processing, speech.requesting, voiceDrawing, voiceFinishRequested]);
+
   const reportError = (error, resumePhase) => {
     operationRef.current = false;
     dispatch({ type: "ERROR", error: friendlyError(error), resumePhase });
   };
+
+  async function persistProject({ html, snapshot, editNote = null }) {
+    if (!user || demoMode) return;
+    const payload = {
+      title: appTitleFromHtml(html),
+      problem: state.problem,
+      html,
+      config: snapshot || {},
+      conversation: state.activity,
+      editNote,
+    };
+    try {
+      if (activeProjectId) {
+        await apiRequest(`/api/projects/${activeProjectId}/versions`, { method: "POST", body: payload });
+      } else {
+        const { project } = await apiRequest("/api/projects", { method: "POST", body: payload });
+        setActiveProjectId(project.id);
+      }
+      const { projects: refreshed } = await apiRequest("/api/projects");
+      setProjects(refreshed);
+    } catch (error) {
+      setProjectsError(`Your app is ready, but it could not be saved: ${error.message}`);
+    }
+  }
+
+  async function openProject(projectId) {
+    try {
+      const { project } = await apiRequest(`/api/projects/${projectId}`);
+      setActiveProjectId(project.id);
+      setProjectsOpen(false);
+      dispatch({ type: "PROJECT_LOADED", project });
+    } catch (error) {
+      setProjectsError(error.message);
+    }
+  }
+
+  async function shareCurrentVersion() {
+    if (!activeProjectId || demoMode) return;
+    try {
+      const { versions } = await apiRequest(`/api/projects/${activeProjectId}/versions`);
+      if (!versions[0]) throw new Error("No saved version is available yet.");
+      const { url } = await apiRequest(`/api/projects/${activeProjectId}/share`, { method: "POST", body: { versionId: versions[0].id } });
+      setShareNotice(`${window.location.origin}${url}`);
+    } catch (error) {
+      setShareNotice(error.message);
+    }
+  }
 
   async function submitProblem(problem) {
     const cleanProblem = problem.trim();
@@ -396,6 +506,7 @@ export default function App() {
         projectSnapshot: nextProjectSnapshot,
         message: `${appTitleFromHtml(html)} is ready. Use it, draw on it, or speak another change.`,
       });
+      void persistProject({ html, snapshot: nextProjectSnapshot });
       setPreviewReady(false);
       setActivePane("app");
       setMarketSnapshot(null);
@@ -418,17 +529,51 @@ export default function App() {
     setDeployNotice("");
     setMobileCompletionOpen(false);
     setProjectsOpen(false);
+    setVoiceDrawing(false);
+    setVoiceFinishRequested(false);
+    setVoiceDrawingError("");
     dispatch({ type: "NEW_APP" });
   };
 
   const startDrawing = () => {
     speech.reset();
+    setVoiceDrawing(false);
+    setVoiceFinishRequested(false);
+    setVoiceDrawingError("");
     dispatch({ type: "DRAWING_STARTED" });
+  };
+
+  const startVoiceDrawing = () => {
+    if (operationRef.current || !connectivity.isOnline) return;
+    setDraft("");
+    setVoiceDrawing(true);
+    setVoiceFinishRequested(false);
+    setVoiceDrawingError("");
+    dispatch({ type: "DRAWING_STARTED" });
+    speech.start();
+  };
+
+  const cancelVoiceDrawing = () => {
+    speech.reset();
+    setVoiceDrawing(false);
+    setVoiceFinishRequested(false);
+    setVoiceDrawingError("");
+    dispatch({ type: "DRAWING_CANCELLED" });
+  };
+
+  const finishVoiceDrawing = () => {
+    if (voiceFinishRequested || speech.processing) return;
+    setVoiceFinishRequested(true);
+    setVoiceDrawingError("");
+    speech.stop();
   };
 
   const openEditCapture = (preferTyping = false) => {
     speech.reset();
     setDraft("");
+    setVoiceDrawing(false);
+    setVoiceFinishRequested(false);
+    setVoiceDrawingError("");
     setEditPrefersTyping(preferTyping);
     dispatch({ type: "DRAWING_CAPTURED", drawing: null });
   };
@@ -436,11 +581,14 @@ export default function App() {
   const drawingDone = (drawing) => {
     speech.reset();
     setDraft("");
+    setVoiceDrawing(false);
+    setVoiceFinishRequested(false);
+    setVoiceDrawingError("");
     setEditPrefersTyping(false);
     dispatch({ type: "DRAWING_CAPTURED", drawing });
   };
 
-  async function submitEdit(instruction) {
+  async function submitEdit(instruction, drawing = state.pendingDrawing) {
     const cleanInstruction = instruction.trim();
     if (!cleanInstruction || operationRef.current || !state.html || !state.appId) return;
     if (!connectivity.isOnline) {
@@ -455,7 +603,7 @@ export default function App() {
     const startedAt = performance.now();
 
     try {
-      let screenshotDataUrl = state.pendingDrawing?.screenshotDataUrl;
+      let screenshotDataUrl = drawing?.screenshotDataUrl;
       if (!screenshotDataUrl) {
         const capture = await previewRef.current.capture();
         screenshotDataUrl = capture.dataUrl;
@@ -464,7 +612,7 @@ export default function App() {
       const response = await editApp({
         html: state.html,
         screenshotDataUrl,
-        component: state.pendingDrawing?.component || null,
+        component: drawing?.component || null,
         instruction: cleanInstruction,
       });
       console.group("[Superflow] submitEdit");
@@ -473,7 +621,7 @@ export default function App() {
         textLength: response.text?.length,
         model: response.model,
         usage: response.usage,
-        component: state.pendingDrawing?.component || null,
+        component: drawing?.component || null,
         instruction: cleanInstruction,
       });
 
@@ -527,6 +675,7 @@ export default function App() {
         projectSnapshot: nextProjectSnapshot,
         message: "Changed. Your previous version stayed in place until this one passed its checks.",
       });
+      void persistProject({ html, snapshot: nextProjectSnapshot, editNote: cleanInstruction });
       setPreviewReady(false);
       operationRef.current = false;
     } catch (error) {
@@ -561,6 +710,7 @@ export default function App() {
 
   const hasApp = Boolean(state.html && state.appId);
   const isDrawing = state.phase === WORKFLOW_PHASES.DRAWING;
+  const isVoiceDrawing = isDrawing && voiceDrawing;
   const isCapturingEdit = state.phase === WORKFLOW_PHASES.CAPTURING_EDIT;
   const isEditing = state.phase === WORKFLOW_PHASES.EDITING
     || state.phase === WORKFLOW_PHASES.VALIDATING_EDIT;
@@ -673,7 +823,12 @@ export default function App() {
             />
           </div>
           <div className="entry-projects-screen" aria-hidden={!projectsOpen} inert={!projectsOpen ? "" : undefined}>
-            <ProjectsPlaceholder onReturn={() => setProjectsOpen(false)} />
+            <ProjectsPlaceholder
+              onReturn={() => setProjectsOpen(false)}
+              projects={projects}
+              error={projectsError}
+              onOpenProject={openProject}
+            />
           </div>
         </div>
       );
@@ -689,11 +844,13 @@ export default function App() {
           onExplore={exploreOpportunities}
           deployNotice={deployNotice}
         />
+        {!demoMode && activeProjectId && <button type="button" className="text-action share-action" onClick={shareCurrentVersion}>Share current version</button>}
+        {shareNotice && <p className="sheet-context">{shareNotice}</p>}
         <div className="keep-improving">
           <p className="quiet-label">Keep improving</p>
           <div className="proposal-actions">
-            <button type="button" className="primary-action compact" onClick={() => openEditCapture(false)}>
-              <MicrophoneIcon size={18} /> Speak a change
+            <button type="button" className="primary-action compact" onClick={startVoiceDrawing}>
+              <MicrophoneIcon size={18} /> Speak + draw
             </button>
             <button type="button" className="text-action" onClick={startDrawing}>
               <DrawIcon size={18} /> Draw on it
@@ -725,6 +882,14 @@ export default function App() {
                 {isApiConfigured() ? (connectivity.isOnline ? "Ready" : "Offline") : "Setup needed"}
               </span>
             </header>
+
+            {demoMode && (
+              <div className="demo-mode-banner">
+                <span>Demo account · changes reset when you leave</span>
+                <button type="button" onClick={onLeaveDemo}>Leave demo</button>
+              </div>
+            )}
+            {demoLoadError && <p className="inline-error" role="alert">{demoLoadError}</p>}
 
             <div className={`rail-content ${activePane === "market" ? "market-rail-content" : ""}`}>
               {activePane === "market" && (marketSnapshot || projectSnapshot) ? (
@@ -794,20 +959,33 @@ export default function App() {
                 </button>
               )}
 
-              {state.phase === WORKFLOW_PHASES.READY && (
-                <div className="tool-dock" aria-label="App editing tools">
-                  <button type="button" className="tool-button" onClick={startDrawing}>
-                    <DrawIcon size={19} /><span>Draw</span>
-                  </button>
-                  <button type="button" className="tool-button primary" onClick={() => openEditCapture(false)}>
-                    <MicrophoneIcon size={20} /><span>Speak</span>
-                  </button>
-                  <button type="button" className="tool-button desktop-only" onClick={() => openEditCapture(true)}>
-                    <KeyboardIcon size={19} /><span>Type</span>
-                  </button>
-                  <button type="button" className="tool-button mobile-only" onClick={() => setMobileCompletionOpen(true)}>
-                    <DoneIcon size={19} /><span>Done</span>
-                  </button>
+              {(state.phase === WORKFLOW_PHASES.READY || isVoiceDrawing) && (
+                <div className={`tool-dock ${isVoiceDrawing ? "is-recording" : ""}`} aria-label="App editing tools">
+                  {isVoiceDrawing ? (
+                    <button
+                      type="button"
+                      className="tool-button primary"
+                      onClick={finishVoiceDrawing}
+                      disabled={voiceFinishRequested || speech.processing}
+                      aria-label={speech.processing ? "Finishing voice edit" : "Finish voice edit"}
+                      title={speech.processing ? "Finishing voice edit" : "Finish voice edit"}
+                    >
+                      <MicrophoneIcon size={18} />
+                      <span className="sr-only">Finish</span>
+                    </button>
+                  ) : (
+                    <>
+                      <button type="button" className="tool-button" onClick={startDrawing} aria-label="Draw on the app" title="Draw on the app">
+                        <DrawIcon size={18} />
+                      </button>
+                      <button type="button" className="tool-button primary" onClick={startVoiceDrawing} aria-label="Speak and draw a change" title="Speak and draw">
+                        <MicrophoneIcon size={18} />
+                      </button>
+                      <button type="button" className="tool-button" onClick={() => openEditCapture(true)} aria-label="Type a change" title="Type a change">
+                        <KeyboardIcon size={18} />
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -843,10 +1021,13 @@ export default function App() {
 
               {isDrawing && (
                 <DrawOverlay
+                  ref={isVoiceDrawing ? drawOverlayRef : null}
                   previewRef={previewRef}
-                  onDone={drawingDone}
-                  onCancel={() => dispatch({ type: "DRAWING_CANCELLED" })}
+                  onDone={isVoiceDrawing ? undefined : drawingDone}
+                  onCancel={isVoiceDrawing ? cancelVoiceDrawing : () => dispatch({ type: "DRAWING_CANCELLED" })}
                   onError={(message) => reportError(new Error(message), WORKFLOW_PHASES.READY)}
+                  error={isVoiceDrawing ? voiceDrawingError || speech.error?.message : ""}
+                  hint={isVoiceDrawing ? "Speak, then circle or underline anything you want refined. Tap the recording button again when you're done." : undefined}
                 />
               )}
 
