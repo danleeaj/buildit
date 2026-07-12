@@ -14,6 +14,7 @@ import {
 import CompletionActions from "./components/CompletionActions.jsx";
 import MarketPane from "./components/MarketPane.jsx";
 import PreviewFrame from "./components/PreviewFrame.jsx";
+import ProjectsPlaceholder from "./components/ProjectsPlaceholder.jsx";
 import VoiceCapture from "./components/VoiceCapture.jsx";
 import useSpeechRecognition from "./hooks/useSpeechRecognition.js";
 import {
@@ -172,6 +173,7 @@ export default function App() {
   const [marketSnapshot, setMarketSnapshot] = useState(null);
   const [deployNotice, setDeployNotice] = useState("");
   const [mobileCompletionOpen, setMobileCompletionOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
   const previewRef = useRef(null);
   const operationRef = useRef(false);
   const approvalHandledRef = useRef("");
@@ -326,6 +328,7 @@ export default function App() {
     setMarketSnapshot(null);
     setDeployNotice("");
     setMobileCompletionOpen(false);
+    setProjectsOpen(false);
     dispatch({ type: "NEW_APP" });
   };
 
@@ -509,16 +512,25 @@ export default function App() {
 
     if (!hasApp) {
       return (
-        <VoiceCapture
-          speech={speech}
-          title="What should work better?"
-          description="Explain the problem naturally. Names, places, and useful details will become part of the app."
-          textValue={draft}
-          onTextValueChange={setDraft}
-          onSubmit={submitProblem}
-          submitLabel="Shape the idea"
-          disabled={!connectivity.isOnline || operationRef.current}
-        />
+        <div className={`entry-flow ${projectsOpen ? "projects-open" : ""}`}>
+          <div className="entry-voice-screen" aria-hidden={projectsOpen} inert={projectsOpen ? "" : undefined}>
+            <VoiceCapture
+              speech={speech}
+              title="What problem would you like to solve?"
+              description=""
+              textValue={draft}
+              onTextValueChange={setDraft}
+              onSubmit={submitProblem}
+              submitLabel="Shape the idea"
+              disabled={!connectivity.isOnline || operationRef.current}
+              landing
+              onOpenProjects={() => setProjectsOpen(true)}
+            />
+          </div>
+          <div className="entry-projects-screen" aria-hidden={!projectsOpen} inert={!projectsOpen ? "" : undefined}>
+            <ProjectsPlaceholder onReturn={() => setProjectsOpen(false)} />
+          </div>
+        </div>
       );
     }
 
@@ -558,8 +570,11 @@ export default function App() {
       <div className={`workspace ${hasApp ? "has-app" : ""} ${activePane === "market" ? "market-open" : ""}`}>
         <aside className="input-rail">
           <div className="rail-inner">
-            <header className="brand-row">
-              <span className="brand-wordmark"><span className="brand-mark">S</span>Superflow</span>
+            <header className={`brand-row ${!hasApp ? "entry-brand-row" : ""}`}>
+              <span className="brand-wordmark">
+                {hasApp && <span className="brand-mark">S</span>}
+                {hasApp ? "Superflow" : "superflow"}
+              </span>
               <span className={`connection-state ${connectivity.isOnline ? "" : "offline"}`}>
                 {isApiConfigured() ? (connectivity.isOnline ? "Ready" : "Offline") : "Setup needed"}
               </span>

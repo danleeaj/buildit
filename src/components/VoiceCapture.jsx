@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ArrowIcon, KeyboardIcon, MicrophoneIcon } from "./Icons.jsx";
+import { ArrowIcon, KeyboardIcon, MicrophoneIcon, ProjectsIcon } from "./Icons.jsx";
 
 export default function VoiceCapture({
   speech,
@@ -12,6 +12,8 @@ export default function VoiceCapture({
   disabled = false,
   compact = false,
   initialTyping = false,
+  landing = false,
+  onOpenProjects,
 }) {
   const [typing, setTyping] = useState(initialTyping);
   const liveTranscript = speech.finalTranscript || speech.interimTranscript;
@@ -34,6 +36,89 @@ export default function VoiceCapture({
     if (!currentValue || disabled || voiceBusy) return;
     onSubmit(currentValue);
   };
+
+  if (landing) {
+    const showTranscript = speech.listening || voiceBusy || Boolean(liveTranscript);
+
+    return (
+      <section className={`voice-capture voice-capture-landing ${speech.listening ? "is-listening" : ""}`}>
+        <div className="voice-copy landing-copy">
+          <h1>{title}</h1>
+        </div>
+
+        <div className="landing-controls">
+          <button
+            type="button"
+            className="landing-side-action"
+            onClick={onOpenProjects}
+            disabled={disabled || voiceBusy}
+            aria-label="Open projects"
+          >
+            <ProjectsIcon size={21} />
+          </button>
+          <button
+            type="button"
+            className="landing-microphone"
+            onClick={toggleListening}
+            disabled={disabled || voiceBusy}
+            aria-pressed={speech.listening}
+            aria-busy={voiceBusy}
+            aria-label={speech.listening ? "Stop listening" : "Start speaking"}
+          >
+            <MicrophoneIcon size={31} />
+            <span className="sr-only">
+              {speech.requesting ? "Opening microphone" : speech.processing ? "Transcribing" : speech.listening ? "Listening" : "Tap to speak"}
+            </span>
+          </button>
+          <button
+            type="button"
+            className="landing-side-action"
+            onClick={() => setTyping(true)}
+            disabled={disabled || voiceBusy}
+            aria-label="Type your request instead"
+          >
+            <KeyboardIcon size={21} />
+          </button>
+        </div>
+
+        <div className={`landing-transcript ${showTranscript ? "is-visible" : ""}`} aria-live="polite">
+          {showTranscript && (liveTranscript || (speech.requesting
+            ? "Opening microphone…"
+            : speech.processing
+              ? "Turning your recording into words…"
+              : "Listening…"))}
+        </div>
+
+        {speech.error && <p className="inline-error" role="alert">{speech.error.message}</p>}
+
+        {typing && (
+          <form className="typed-fallback landing-typed-fallback" onSubmit={submit}>
+            <label htmlFor="typed-request">Type your request</label>
+            <textarea
+              id="typed-request"
+              value={textValue}
+              onChange={(event) => onTextValueChange(event.target.value)}
+              rows={3}
+              placeholder="Describe it in your own words"
+              disabled={disabled}
+              autoFocus
+            />
+            <button type="submit" className="primary-action" disabled={!currentValue || disabled || voiceBusy}>
+              <span>{submitLabel}</span>
+              <ArrowIcon size={18} />
+            </button>
+          </form>
+        )}
+
+        {!typing && currentValue && !speech.listening && !voiceBusy && (
+          <button type="button" className="primary-action landing-submit" onClick={submit} disabled={disabled}>
+            <span>{submitLabel}</span>
+            <ArrowIcon size={18} />
+          </button>
+        )}
+      </section>
+    );
+  }
 
   return (
     <section className={`voice-capture ${compact ? "compact" : ""}`}>

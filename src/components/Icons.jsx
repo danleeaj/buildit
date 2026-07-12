@@ -44,6 +44,15 @@ export function KeyboardIcon(props) {
   );
 }
 
+export function ProjectsIcon(props) {
+  return (
+    <Icon {...props}>
+      <path d="M6 7h12M6 12h12M6 17h12" />
+      <path d="M3.5 7h.01M3.5 12h.01M3.5 17h.01" />
+    </Icon>
+  );
+}
+
 export function BackIcon(props) {
   return (
     <Icon {...props}>
