@@ -155,8 +155,42 @@ async function validateModelDocument(modelResult, appId) {
   return { ok: true, value: { html, appId } };
 }
 
+const DID_YOU_KNOW_TIPS = [
+  "95% of new products fail. The ones that survive almost always talked to real users before writing code.",
+  "A landing page that explains your product can validate demand before you build anything.",
+  "The first version of Dropbox was a 3-minute video — no working product, just proof people wanted it.",
+  "Charging even $1 early on tells you more about demand than 1,000 free signups.",
+  "Most successful founders spent more time on distribution than on the product itself.",
+  "A waitlist with 100 engaged people is worth more than an app with 10,000 passive downloads.",
+  "The best MVPs solve exactly one problem extremely well, not ten problems halfway.",
+  "Your product's value isn't what it does — it's the pain it removes from someone's day.",
+  "Talking to 5 users will uncover 80% of your usability issues. You don't need a massive study.",
+  "Products that grow by word of mouth have 2–5x better retention than paid-acquisition products.",
+  "Instagram launched with 13 features, cut 11 of them before release, and shipped only photos + filters.",
+  "A clear one-sentence pitch makes everything else easier — marketing, hiring, fundraising.",
+  "Notion almost died twice before finding its audience. Persistence and repositioning saved it.",
+  "Customers don't buy features — they buy progress toward a better version of their situation.",
+  "Pre-selling (taking payment before the product exists) is the strongest signal you can get.",
+  "The \"do things that don't scale\" phase isn't a shortcut — it's where you learn what to automate later.",
+  "Products that ship weekly updates in their first 90 days retain 30% more early users.",
+  "Your biggest competitor isn't another app — it's your user's current habit of doing nothing.",
+  "A simple product with great onboarding beats a powerful product with a confusing first minute.",
+  "Every feature you add makes every other feature slightly harder to find. Edit ruthlessly.",
+];
+
 function ProgressPanel({ phase }) {
   const [title, copy] = progressContent(phase);
+  const showTip = phase === WORKFLOW_PHASES.GENERATING;
+  const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * DID_YOU_KNOW_TIPS.length));
+
+  useEffect(() => {
+    if (!showTip) return;
+    const id = setInterval(() => {
+      setTipIndex(i => (i + 1) % DID_YOU_KNOW_TIPS.length);
+    }, 8000);
+    return () => clearInterval(id);
+  }, [showTip]);
+
   const steps = [
     { key: "idea", label: "Understand the problem" },
     { key: "build", label: "Create the app" },
@@ -172,6 +206,11 @@ function ProgressPanel({ phase }) {
     <section className="progress-panel" aria-live="polite">
       <h1 className="progress-title">{title}</h1>
       <p className="progress-copy">{copy}</p>
+      {showTip && (
+        <p className="progress-tip" key={tipIndex}>
+          <strong>Did you know?</strong> {DID_YOU_KNOW_TIPS[tipIndex]}
+        </p>
+      )}
       <div className="progress-steps">
         {steps.map((step, index) => (
           <div className={`progress-step ${index === activeIndex ? "active" : ""}`} key={step.key}>
@@ -945,7 +984,7 @@ export default function App({ demoMode = false, onLeaveDemo }) {
 
               <div className="preview-controls">
                 <button type="button" className="floating-action" onClick={startNewApp} aria-label="Build a new app">
-                  <BackIcon size={20} />
+                  <BackIcon size={16} />
                 </button>
               </div>
 

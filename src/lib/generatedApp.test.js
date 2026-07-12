@@ -78,13 +78,18 @@ describe("patch parsing", () => {
 });
 
 describe("preview bridge capture", () => {
-  test("uses an in-frame SVG capture instead of html2canvas", () => {
+  test("uses an origin-clean in-frame SVG capture", () => {
     const runtime = createPreviewBridgeRuntime({
       sessionId: "session-1",
       appId: "app-test",
       mode: "live",
     });
     expect(runtime).toContain("foreignObject");
+    expect(runtime).toContain("data:image/svg+xml;charset=utf-8,");
+    expect(runtime).toContain("encodeURIComponent(svg)");
+    expect(runtime).not.toContain("createObjectURL");
+    expect(runtime).not.toContain("revokeObjectURL");
     expect(runtime).not.toContain("html2canvas");
+    expect(runtime).not.toContain("allow-same-origin");
   });
 });

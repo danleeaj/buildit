@@ -67,7 +67,6 @@ export function createPreviewBridgeRuntime({ sessionId, appId, mode }) {
     });
 
     const capturePreview = () => new Promise((resolve, reject) => {
-      let objectUrl = "";
       try {
         const width = Math.max(1, document.documentElement.clientWidth || window.innerWidth);
         const height = Math.max(1, window.innerHeight || document.documentElement.clientHeight);
@@ -77,7 +76,7 @@ export function createPreviewBridgeRuntime({ sessionId, appId, mode }) {
 
         const markup = new XMLSerializer().serializeToString(copy);
         const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="' + width + '" height="' + height + '" viewBox="0 0 ' + width + ' ' + height + '"><foreignObject width="100%" height="100%">' + markup + "</foreignObject></svg>";
-        objectUrl = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+        const svgDataUrl = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg);
 
         const image = new Image();
         image.onload = () => {
@@ -99,17 +98,13 @@ export function createPreviewBridgeRuntime({ sessionId, appId, mode }) {
             });
           } catch (error) {
             reject(error instanceof Error ? error : new Error(String(error)));
-          } finally {
-            URL.revokeObjectURL(objectUrl);
           }
         };
         image.onerror = () => {
-          URL.revokeObjectURL(objectUrl);
           reject(new Error("Could not capture the generated app."));
         };
-        image.src = objectUrl;
+        image.src = svgDataUrl;
       } catch (error) {
-        if (objectUrl) URL.revokeObjectURL(objectUrl);
         reject(error instanceof Error ? error : new Error(String(error)));
       }
     });

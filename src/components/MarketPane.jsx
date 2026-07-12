@@ -676,6 +676,25 @@ export default function MarketPane({ snapshot, onBack, isOnline = true }) {
             )}
           </header>
 
+          {/* ponytail: sticky jump-nav for quick section access — upgrade to IntersectionObserver highlight if scroll-spy needed */}
+          <nav className="market-section-nav" aria-label="Jump to section">
+            {[
+              { id: "market-comparators-title", label: "01 Comparables" },
+              { id: "market-opportunity-title", label: "02 Opportunity" },
+              { id: "market-estimate-title", label: "03 Estimate" },
+              { id: "market-next-title", label: "04 Next" },
+            ].map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                className="market-section-nav-item"
+                onClick={() => document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" })}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+
           <ComparatorList comparators={result.comparators} sourceNumbers={sourceNumbers} />
           <OpportunitySection opportunity={result.opportunity} />
           <MarketEstimate estimate={result.marketOpportunity} sourceNumbers={sourceNumbers} />

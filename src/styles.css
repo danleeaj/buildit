@@ -1009,6 +1009,23 @@ input:disabled {
   line-height: 1.5;
 }
 
+.progress-tip {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  animation: tip-fade 0.4s ease;
+}
+
+.progress-tip strong {
+  color: #000;
+}
+
+@keyframes tip-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 .progress-steps {
   margin-top: 30px;
   display: grid;
@@ -1117,24 +1134,32 @@ input:disabled {
 .preview-controls {
   position: absolute;
   z-index: 30;
-  top: max(10px, env(safe-area-inset-top));
-  left: max(10px, env(safe-area-inset-left));
+  top: max(6px, env(safe-area-inset-top));
+  left: max(6px, env(safe-area-inset-left));
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
 .floating-action {
-  min-width: 44px;
-  min-height: 44px;
-  border: 1px solid rgb(227 227 223 / 0.92);
+  min-width: 34px;
+  min-height: 34px;
+  width: 34px;
+  height: 34px;
+  border: 1px solid rgb(227 227 223 / 0.82);
   border-radius: 50%;
   display: grid;
   place-items: center;
-  background: rgb(255 255 255 / 0.96);
-  color: var(--ink);
-  box-shadow: 0 8px 24px rgb(17 17 19 / 0.1);
+  background: rgb(255 255 255 / 0.88);
+  color: var(--ink-soft);
+  box-shadow: 0 4px 12px rgb(17 17 19 / 0.07);
   cursor: pointer;
   backdrop-filter: blur(10px);
+  opacity: 0.75;
+  transition: opacity 160ms ease;
+}
+
+.floating-action:hover {
+  opacity: 1;
 }
 
 .tool-dock {
