@@ -1,110 +1,153 @@
-// DrawOverlay.jsx — canvas over the app iframe. Pointer Events + touch-action:none
-// (THE demo-critical detail: mouse events alone = phone scrolls instead of draws).
-// On finish: composites screenshot + ink, hit-tests the stroke centroid against
-// the iframe's [data-component] elements, hands both to the parent.
+import { useEffect, useRef, useState } from "react";
 
-import { useRef, useEffect } from "react";
-import html2canvas from "html2canvas";
+function loadImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.onload = () => resolve(image);
+    image.onerror = () => reject(new Error("Could not read the app screenshot"));
+    image.src = dataUrl;
+  });
+}
 
-export default function DrawOverlay({ iframeRef, onDone, onCancel }) {
+export default function DrawOverlay({ previewRef, onDone, onCancel, onError }) {
   const canvasRef = useRef(null);
   const points = useRef([]);
   const drawing = useRef(false);
+  const [hasInk, setHasInk] = useState(false);
+  const [finishing, setFinishing] = useState(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
     const dpr = window.devicePixelRatio || 1;
     const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
-    const ctx = canvas.getContext("2d");
-    ctx.scale(dpr, dpr);
-    ctx.strokeStyle = "#ef4444";
-    ctx.lineWidth = 4;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    canvas.width = Math.round(rect.width * dpr);
+    canvas.height = Math.round(rect.height * dpr);
+    const context = canvas.getContext("2d");
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+    context.strokeStyle = "#e5484d";
+    context.lineWidth = 4;
+    context.lineCap = "round";
+    context.lineJoin = "round";
   }, []);
 
-  const pos = (e) => {
-    const r = canvasRef.current.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  const positionFor = (event) => {
+    const rect = canvasRef.current.getBoundingClientRect();
+    return { x: event.clientX - rect.left, y: event.clientY - rect.top };
   };
 
-  const down = (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
+  const startDrawing = (event) => {
+    event.currentTarget.setPointerCapture(event.pointerId);
     drawing.current = true;
-    points.current.push(pos(e));
+    points.current.push(positionFor(event));
   };
 
-  const move = (e) => {
+  const continueDrawing = (event) => {
     if (!drawing.current) return;
-    const p = pos(e);
-    const prev = points.current[points.current.length - 1];
-    points.current.push(p);
-    const ctx = canvasRef.current.getContext("2d");
-    ctx.beginPath();
-    ctx.moveTo(prev.x, prev.y);
-    ctx.lineTo(p.x, p.y);
-    ctx.stroke();
+    const point = positionFor(event);
+    const previous = points.current.at(-1);
+    points.current.push(point);
+    if (!previous) return;
+    const context = canvasRef.current.getContext("2d");
+    context.beginPath();
+    context.moveTo(previous.x, previous.y);
+    context.lineTo(point.x, point.y);
+    context.stroke();
+    setHasInk(true);
   };
 
-  const up = () => (drawing.current = false);
+  const stopDrawing = () => {
+    drawing.current = false;
+  };
+
+  const clear = () => {
+    const canvas = canvasRef.current;
+    const context = canvas.getContext("2d");
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    points.current = [];
+    drawing.current = false;
+    setHasInk(false);
+  };
 
   async function finish() {
-    if (points.current.length < 2) return onCancel();
-    const pts = points.current;
+    if (points.current.length < 2 || !previewRef.current) return;
+    setFinishing(true);
+    try {
+      const samples = points.current;
+      const centroid = samples.reduce(
+        (total, point) => ({ x: total.x + point.x, y: total.y + point.y }),
+        { x: 0, y: 0 },
+      );
+      centroid.x /= samples.length;
+      centroid.y /= samples.length;
 
-    // 1. Hit-test: stroke centroid -> element inside the same-origin iframe.
-    const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
-    const cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
-    const doc = iframeRef.current.contentDocument;
-    const el = doc.elementFromPoint(cx, cy);
-    const component =
-      el?.closest("[data-component]")?.getAttribute("data-component") || null;
+      const [hit, capture] = await Promise.all([
+        previewRef.current.hitTest(centroid.x, centroid.y),
+        previewRef.current.capture(),
+      ]);
+      const image = await loadImage(capture.dataUrl);
+      const output = document.createElement("canvas");
+      output.width = capture.width;
+      output.height = capture.height;
+      const context = output.getContext("2d");
+      context.drawImage(image, 0, 0, output.width, output.height);
 
-    // 2. Screenshot the app, then draw the ink on top.
-    const shot = await html2canvas(doc.body, {
-      windowWidth: doc.body.clientWidth,
-      scale: 1,
-    });
-    const out = document.createElement("canvas");
-    out.width = shot.width;
-    out.height = shot.height;
-    const ctx = out.getContext("2d");
-    ctx.drawImage(shot, 0, 0);
-    ctx.strokeStyle = "#ef4444";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
-    ctx.stroke();
+      const overlayRect = canvasRef.current.getBoundingClientRect();
+      const scaleX = output.width / overlayRect.width;
+      const scaleY = output.height / overlayRect.height;
+      context.strokeStyle = "#e5484d";
+      context.lineWidth = 4 * Math.max(scaleX, scaleY);
+      context.lineCap = "round";
+      context.lineJoin = "round";
+      context.beginPath();
+      samples.forEach((point, index) => {
+        const x = point.x * scaleX;
+        const y = point.y * scaleY;
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      });
+      context.stroke();
 
-    onDone({ component, screenshotDataUrl: out.toDataURL("image/png") });
+      onDone({
+        component: hit.component,
+        componentRect: hit.rect,
+        screenshotDataUrl: output.toDataURL("image/png"),
+      });
+    } catch (error) {
+      onError?.(error instanceof Error ? error.message : String(error));
+    } finally {
+      setFinishing(false);
+    }
   }
 
   return (
-    <div className="absolute inset-0 z-20">
+    <div className="draw-overlay" aria-label="Draw on the app">
       <canvas
         ref={canvasRef}
-        className="absolute inset-0 w-full h-full cursor-crosshair"
-        style={{ touchAction: "none" }} /* <- do not remove */
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
+        className="draw-canvas"
+        aria-label="Drawing surface"
+        style={{ touchAction: "none" }}
+        onPointerDown={startDrawing}
+        onPointerMove={continueDrawing}
+        onPointerUp={stopDrawing}
+        onPointerCancel={stopDrawing}
       />
-      <div className="absolute top-3 inset-x-0 flex justify-center gap-2">
-        <button
-          onClick={finish}
-          className="bg-red-500 text-white text-sm font-semibold px-4 py-2 rounded-full shadow"
-        >
-          Done drawing
-        </button>
-        <button
-          onClick={onCancel}
-          className="bg-white text-gray-600 text-sm px-4 py-2 rounded-full shadow"
-        >
+      <div className="draw-controls">
+        <button type="button" className="icon-action" onClick={onCancel} aria-label="Cancel drawing">
           Cancel
         </button>
+        <button type="button" className="icon-action" onClick={clear} disabled={!hasInk || finishing}>
+          Clear
+        </button>
+        <button
+          type="button"
+          className="primary-action compact"
+          onClick={finish}
+          disabled={!hasInk || finishing}
+        >
+          {finishing ? "Reading mark…" : "Use mark"}
+        </button>
       </div>
+      <p className="draw-hint">Circle or underline the part you want to change.</p>
     </div>
   );
 }

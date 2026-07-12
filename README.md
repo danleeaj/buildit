@@ -1,17 +1,44 @@
-# BuildIt — 7h hackathon scaffold
+# BuildIt
 
-## Setup (5 min)
-1. npm install
-2. cp .env.example .env  → paste your Anthropic API key
-3. Replace design.md with your real one
-4. npm run dev  → note the Network URL, open it on your phone (same wifi)
+BuildIt turns a spoken or typed problem into a focused, single-screen app. The current milestone is a demo-first PWA with arbitrary client-only app generation, a sandboxed live preview, and voice- or drawing-led edits.
 
-## What's wired
-- Chat → intent router (Haiku) → propose / build / edit
-- Config call → tracker skeleton → srcdoc iframe (instant "hot reload")
-- Pencil → draw overlay (pointer events) → hit-test → Sonnet vision edit
-  → block swap via DOMParser (old HTML survives any parse failure)
+## Run locally
 
-## What's NOT wired yet (per PRD hours)
-- H5: streaming, text-only edits, config-vs-code split for FEATURE
-- H6: skeleton #2 (collector), variants (call editApp twice w/ styleHint), share/QR, mic
+```bash
+bun install
+cp .env.example .env
+bun run dev
+```
+
+Add a working OpenAI API key to `.env`, then open the local URL printed by Vite.
+
+## Voice input
+
+Voice capture uses `MediaRecorder` first and sends the finished recording to OpenAI's transcription endpoint. Tap **Tap to speak**, allow microphone access, speak, then tap again to finish. The transcript appears after processing. Browser speech recognition is used only when recorded audio is unavailable.
+
+Microphone access requires either:
+
+- `localhost` on the development computer, or
+- an HTTPS deployment on a phone or another device.
+
+If permission was previously denied, re-enable microphone access in the browser's site settings. Typed input always remains available.
+
+## Current capabilities
+
+- Voice-first problem capture with typed fallback
+- One-shot generation of arbitrary, client-only single-screen apps
+- Validation and one automatic repair attempt before preview
+- Opaque sandboxed preview with bridged app storage
+- Draw-to-target and voice-to-edit interactions
+- Installable PWA shell with offline access to the current app
+
+## Demo security boundary
+
+The current local demo reads `VITE_OPENAI_API_KEY` in the browser. Do not publish this build with a valuable or unrestricted key. Before deployment, move generation, editing, and transcription requests behind a server-side API and use a server-only environment variable.
+
+## Checks
+
+```bash
+bun test
+bun run build
+```
