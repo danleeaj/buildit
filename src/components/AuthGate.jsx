@@ -55,7 +55,7 @@ function AuthForm({ onTryDemo }) {
           <button className="primary-action" type="submit" disabled={pending}>{pending ? "Working…" : mode === "sign-up" ? "Create account" : "Sign in"}</button>
         </form>
         <button className="text-action auth-toggle" type="button" onClick={() => setMode(mode === "sign-up" ? "sign-in" : "sign-up")}>{mode === "sign-up" ? "Already have an account? Sign in" : "New here? Create an account"}</button>
-        <button className="auth-demo" type="button" onClick={onTryDemo}>Try demo account <span>Changes reset when you leave</span></button>
+        <button className="auth-demo" type="button" onClick={onTryDemo}>Try it first <span>Sign in later to keep your work</span></button>
       </section>
     </main>
   );
@@ -69,7 +69,7 @@ function ConfiguredAuthGate({ children, onTryDemo }) {
 
 export default function AuthGate({ children, onTryDemo }) {
   if (!isAuthConfigured) {
-    return <main className="auth-shell"><HyperspaceBackground /><section className="auth-card"><p className="quiet-label">superflow</p><h1>Build anywhere.</h1><p className="auth-copy">Add VITE_NEON_AUTH_URL, then reload.</p><button className="auth-demo" type="button" onClick={onTryDemo}>Try demo account <span>Changes reset when you leave</span></button></section></main>;
+    return <main className="auth-shell"><HyperspaceBackground /><section className="auth-card"><p className="quiet-label">superflow</p><h1>Build anywhere.</h1><p className="auth-copy">Add VITE_NEON_AUTH_URL, then reload.</p><button className="auth-demo" type="button" onClick={onTryDemo}>Try it first <span>Sign in later to keep your work</span></button></section></main>;
   }
   return <ConfiguredAuthGate onTryDemo={onTryDemo}>{children}</ConfiguredAuthGate>;
 }

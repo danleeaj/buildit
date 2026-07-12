@@ -251,7 +251,6 @@ export default function App({ demoMode = false, onLeaveDemo }) {
   const [voiceDrawing, setVoiceDrawing] = useState(false);
   const [voiceFinishRequested, setVoiceFinishRequested] = useState(false);
   const [voiceDrawingError, setVoiceDrawingError] = useState("");
-  const [demoLoadError, setDemoLoadError] = useState("");
   const [shareNotice, setShareNotice] = useState("");
   const shareUrlRef = useRef("");
   const previewRef = useRef(null);
@@ -292,19 +291,7 @@ export default function App({ demoMode = false, onLeaveDemo }) {
 
   useEffect(() => subscribeToConnectivity(setConnectivity), []);
 
-  useEffect(() => {
-    if (!demoMode) return undefined;
-    let cancelled = false;
-    fetch("/api/demo")
-      .then((response) => response.ok ? response.json() : Promise.reject(new Error("The demo account is not ready yet.")))
-      .then(({ project }) => {
-        if (!cancelled) dispatch({ type: "PROJECT_LOADED", project });
-      })
-      .catch((error) => {
-        if (!cancelled) setDemoLoadError(error instanceof Error ? error.message : "The demo account is not ready yet.");
-      });
-    return () => { cancelled = true; };
-  }, [demoMode]);
+
 
   useEffect(() => {
     const controller = createInstallController();
@@ -962,11 +949,10 @@ export default function App({ demoMode = false, onLeaveDemo }) {
 
             {demoMode && (
               <div className="demo-mode-banner">
-                <span>Demo account · changes reset when you leave</span>
-                <button type="button" onClick={onLeaveDemo}>Leave demo</button>
+                <span>Demo · sign in to keep your work</span>
+                <button type="button" onClick={onLeaveDemo}>Sign in</button>
               </div>
             )}
-            {demoLoadError && <p className="inline-error" role="alert">{demoLoadError}</p>}
 
             <div className={`rail-content ${activePane === "market" ? "market-rail-content" : ""}`}>
               {activePane === "market" && (marketSnapshot || projectSnapshot) ? (
